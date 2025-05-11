@@ -12,7 +12,14 @@ import { notFound, errorHandler } from './middleware/errorMiddleware';
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://dashboard-frontend-p693.onrender.com',
+    'http://localhost:3000' // Für lokale Entwicklung
+  ],
+  credentials: true
+}));
+
 app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
