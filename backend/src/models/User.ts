@@ -23,6 +23,50 @@ export interface User {
   updatedAt: Date;
   temporaryToken?: string;
   temporaryTokenExpires?: Date;
+}
+
+interface UserLocation {
+  userId: string;
+  locationId: string;
+}
+
+interface Location {
+  id: string;
+  name: string;
+  createdAt: Date;
+}
+
+interface CustomButton {
+  id: string;
+  name: string;
+  url: string;
+  locationId: string;
+  createdBy: string;
+  createdAt: Date;
+}
+
+interface ButtonPermission {
+  buttonId: string;
+  role?: string;
+  userId?: string;
+}
+
+interface EmailTemplate {
+  id: string;
+  name: string;
+  subject: string;
+  body: string;
+  locationId: string;
+  createdAt: Date;
+}
+
+interface SentEmail {
+  id: string;
+  recipient_email: string;
+  recipient_name: string;
+  status: 'sent' | 'failed' | 'resent';
+  sent_at: Date;
+}
 
 export const createUser = async (email: string, password: string, role: string, locations: string[], createdBy: string): Promise<User> => {
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -31,6 +75,31 @@ export const createUser = async (email: string, password: string, role: string, 
 
   try {
     await client.query('BEGIN');
+
+    const userQuery = `
+      INSERT INTO users (id, email, password, role, created_by, is_active)
+      VALUES ($1, $2, $3, $4, $5, true)
+      RETURNING *`;
+    const userValues = [userId, email, hashedPassword, role, createdBy];
+    const userResult = await client.query(userQuery, userValues);
+    const user = userResult.rows[0];
+
+    for (const locationId of locations) {
+      const locationQuery = `
+        INSERT INTO user_locations (user_id, location_id)
+        VALUES ($1, $2)`;
+      await client.query(locationQuery, [userId, locationId]);
+    }
+
+    await client.query('COMMIT');
+    return user;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  };
+
 
     // Create user
     const userQuery = `
