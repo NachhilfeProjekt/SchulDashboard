@@ -8,18 +8,12 @@ import locationRoutes from './routes/locationRoutes';
 import buttonRoutes from './routes/buttonRoutes';
 import emailRoutes from './routes/emailRoutes';
 import { notFound, errorHandler } from './middleware/errorMiddleware';
+import logger from './config/logger';
 
 const app = express();
 
 // Middleware
-app.use(cors({
-  origin: [
-    'https://dashboard-frontend-p693.onrender.com',
-    'http://localhost:3000' // Für lokale Entwicklung
-  ],
-  credentials: true
-}));
-
+app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
@@ -33,7 +27,7 @@ app.use('/api/buttons', buttonRoutes);
 app.use('/api/emails', emailRoutes);
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (req: express.Request, res: express.Response) => {
   res.status(200).json({ status: 'OK' });
 });
 
@@ -43,5 +37,5 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info(`Server running on port ${PORT}`);
 });
