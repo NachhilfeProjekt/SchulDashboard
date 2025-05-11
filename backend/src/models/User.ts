@@ -3,42 +3,26 @@ import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import { sendEmail } from '../services/emailService';
 
-interface User {
+export enum UserRole {
+  DEVELOPER = 'developer',
+  LEAD = 'lead',
+  OFFICE = 'office',
+  TEACHER = 'teacher'
+}
+
+export interface User {
   id: string;
   email: string;
   password: string;
-  role: 'developer' | 'lead' | 'office' | 'teacher';
+  role: UserRole;
+  is_active: boolean;
+  created_by?: string;
+  deactivated_by?: string;
+  deactivated_at?: Date;
   createdAt: Date;
   updatedAt: Date;
   temporaryToken?: string;
   temporaryTokenExpires?: Date;
-}
-
-interface UserLocation {
-  userId: string;
-  locationId: string;
-}
-
-interface Location {
-  id: string;
-  name: string;
-  createdAt: Date;
-}
-
-interface CustomButton {
-  id: string;
-  name: string;
-  url: string;
-  locationId: string;
-  createdBy: string;
-  createdAt: Date;
-}
-
-interface ButtonPermission {
-  buttonId: string;
-  role: string;
-  userId?: string;
-}
 
 export const createUser = async (email: string, password: string, role: string, locations: string[], createdBy: string): Promise<User> => {
   const hashedPassword = await bcrypt.hash(password, 10);
