@@ -1,0 +1,19 @@
+services:
+  - name: dashboard-backend
+    type: web
+    plan: free
+    nodeVersion: 18.x
+    buildCommand: |
+      cd backend
+      if [ -f package-lock.json ]; then
+        npm ci --production=false
+      else
+        npm install --production=false
+      fi
+      npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NPM_CONFIG_PRODUCTION
+        value: false
