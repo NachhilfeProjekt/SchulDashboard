@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Backend for the Dashboard System",
   "main": "src/app.ts",
-  "scripts": {
+ "scripts": {
     "build": "npm run clean && tsc",
     "clean": "rm -rf dist/*",
     "start": "node dist/app.js",
