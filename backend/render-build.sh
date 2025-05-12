@@ -1,14 +1,13 @@
 #!/bin/bash
-# Prüfe ob im CI-Modus
-if [ "$CI" = "true" ]; then
-  npm ci --production=false
-else
-  npm install --production=false
-fi
+# Sicherstellen, dass TypeScript installiert ist
+npm install -g typescript
 
-# Build mit Cache-Support
+# Abhängigkeiten installieren
+npm install --production=false
+
+# Build durchführen
 npm run build
 
-# Bereinigung
+# Aufräumen
 find node_modules -name "*.ts" -delete
 rm -rf node_modules/.cache
