@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "description": "Backend for the Dashboard System",
   "main": "src/app.ts",
- "scripts": {
-    "build": "npm run clean && tsc",
+  "scripts": {
+    "build": "npm run clean && tsc --noEmitOnError",
+    "type-check": "tsc --noEmit"
     "clean": "rm -rf dist/*",
     "start": "node dist/app.js",
     "dev": "nodemon src/app.ts",
