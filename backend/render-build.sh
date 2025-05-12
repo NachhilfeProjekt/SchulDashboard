@@ -1,13 +1,14 @@
 #!/bin/bash
-# Install dependencies
-npm install --production=false
+# Prüfe ob im CI-Modus
+if [ "$CI" = "true" ]; then
+  npm ci --production=false
+else
+  npm install --production=false
+fi
 
-# Fix potential permission issues
-npm rebuild
-
-# Build the project
+# Build mit Cache-Support
 npm run build
 
-# Clean up unnecessary files to reduce deployment size
-rm -rf node_modules/@types
-find node_modules -name "*.ts" -exec rm -rf {} \;
+# Bereinigung
+find node_modules -name "*.ts" -delete
+rm -rf node_modules/.cache
