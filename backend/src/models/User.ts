@@ -143,4 +143,22 @@ export const resetPassword = async (token: string, newPassword: string): Promise
   );
 
   return true;
+  export {
+  createUser,
+  getUserByEmail,
+  getUserById,
+  comparePasswords,
+  createTemporaryToken,
+  resetPassword,
+  getUsersByLocation,
+  getLocations,
+  createLocation,
+  getUserLocations,
+  createCustomButton,
+  getButtonsForUser,
+  setButtonPermissions,
+  getEmailTemplates,
+  createEmailTemplate,
+  sendBulkEmails
+};
 };
