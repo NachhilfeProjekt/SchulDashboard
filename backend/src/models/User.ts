@@ -1,9 +1,17 @@
+import { Pool } from 'pg';
+import { v4 as uuidv4 } from 'uuid';
+import * as bcrypt from 'bcryptjs';
+import { sendEmail } from '../services/emailService';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
+
 export enum UserRole {
   DEVELOPER = 'developer',
   LEAD = 'lead',
   OFFICE = 'office',
   TEACHER = 'teacher'
-
 }
 
 export interface User {
@@ -139,7 +147,7 @@ export const resetPassword = async (token: string, newPassword: string): Promise
   );
 
   return true;
-export {
+export const UserModel = {
   createUser,
   getUserByEmail,
   getUserById,
