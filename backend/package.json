@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "description": "Backend for the Dashboard System",
   "main": "src/app.ts",
-  "scripts": {
+   "scripts": {
+    "fix-types": "npm install @types/express @types/node @types/pg @types/uuid @types/bcryptjs @types/jsonwebtoken @types/winston && npm run type-check",
     "build": "npm run clean && tsc --noEmitOnError",
-    "type-check": "tsc --noEmit",
-    "fix-types": "npm run type-check || (echo 'Fixing types...' && npm install @types/{express,node,pg,uuid,bcryptjs,jsonwebtoken,winston} && npm run type-check)"
-  },
+    "prebuild": "npm run fix-types"
+  };
   "dependencies": {
     "@sendgrid/mail": "^7.7.0",
     "bcryptjs": "^2.4.3",
