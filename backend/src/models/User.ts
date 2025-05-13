@@ -143,7 +143,7 @@ export const resetPassword = async (token: string, newPassword: string): Promise
   );
 
   return true;
-  export {
+export default {
   createUser,
   getUserByEmail,
   getUserById,
@@ -159,6 +159,7 @@ export const resetPassword = async (token: string, newPassword: string): Promise
   setButtonPermissions,
   getEmailTemplates,
   createEmailTemplate,
-  sendBulkEmails
+  sendBulkEmails,
+  UserRole
 };
 };
