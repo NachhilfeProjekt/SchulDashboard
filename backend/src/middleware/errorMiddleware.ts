@@ -1,8 +1,9 @@
+// backend/src/middleware/errorMiddleware.ts
 import { Request, Response, NextFunction } from 'express';
 
 export const notFound = (req: Request, res: Response, next: NextFunction) => {
   res.status(404);
-  const error = new Error(`Not found - ${req.method} ${req.originalUrl}`);
+  const error = new Error(`Nicht gefunden - ${req.method} ${req.originalUrl}`);
   next(error);
 };
 
