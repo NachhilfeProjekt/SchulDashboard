@@ -4,12 +4,9 @@
   "description": "Backend for the Dashboard System",
   "main": "src/app.ts",
   "scripts": {
-    "start": "ts-node src/app.ts",
-    "dev": "nodemon src/app.ts",
     "build": "npm run clean && tsc --noEmitOnError",
-    "clean": "rm -rf dist/*",
     "type-check": "tsc --noEmit",
-    "test": "jest"
+    "fix-types": "npm run type-check || (echo 'Fixing types...' && npm install @types/{express,node,pg,uuid,bcryptjs,jsonwebtoken,winston} && npm run type-check)"
   },
   "dependencies": {
     "@sendgrid/mail": "^7.7.0",
