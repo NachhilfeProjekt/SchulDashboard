@@ -10,7 +10,7 @@
     "prebuild": "npm run fix-types",
     "clean": "rm -rf dist/*",
     "type-check": "tsc --noEmit",
-    "fix-types": "npm install @types/{express,node,pg,uuid,bcryptjs,jsonwebtoken,winston} --save-dev"
+    "fix-types": "npm install @types/{express,node,pg,uuid,bcryptjs,jsonwebtoken,winston} --save-dev",
     "test": "jest"
   },
   "dependencies": {
