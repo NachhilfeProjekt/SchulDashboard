@@ -6,10 +6,11 @@
   "scripts": {
     "start": "ts-node src/app.ts",
     "dev": "nodemon src/app.ts",
-    "build": "npm run clean && tsc --noEmitOnError",
+    "build": "npm run clean && tsc",
+    "prebuild": "npm run fix-types",
     "clean": "rm -rf dist/*",
     "type-check": "tsc --noEmit",
-    "fix-types": "npm install @types/express @types/node @types/pg @types/uuid @types/bcryptjs @types/jsonwebtoken @types/winston && npm run type-check",
+    "fix-types": "npm install @types/{express,node,pg,uuid,bcryptjs,jsonwebtoken,winston} --save-dev"
     "test": "jest"
   },
   "dependencies": {
