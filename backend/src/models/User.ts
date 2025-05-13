@@ -1,13 +1,9 @@
-import pool from '../config/database';
-import { v4 as uuidv4 } from 'uuid';
-import bcrypt from 'bcryptjs';
-import { sendEmail } from '../services/emailService';
-
 export enum UserRole {
   DEVELOPER = 'developer',
   LEAD = 'lead',
   OFFICE = 'office',
   TEACHER = 'teacher'
+
 }
 
 export interface User {
