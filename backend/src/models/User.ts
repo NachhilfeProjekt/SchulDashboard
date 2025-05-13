@@ -29,49 +29,6 @@ export interface User {
   temporaryTokenExpires?: Date;
 }
 
-interface UserLocation {
-  userId: string;
-  locationId: string;
-}
-
-interface Location {
-  id: string;
-  name: string;
-  createdAt: Date;
-}
-
-interface CustomButton {
-  id: string;
-  name: string;
-  url: string;
-  locationId: string;
-  createdBy: string;
-  createdAt: Date;
-}
-
-interface ButtonPermission {
-  buttonId: string;
-  role?: string;
-  userId?: string;
-}
-
-interface EmailTemplate {
-  id: string;
-  name: string;
-  subject: string;
-  body: string;
-  locationId: string;
-  createdAt: Date;
-}
-
-interface SentEmail {
-  id: string;
-  recipient_email: string;
-  recipient_name: string;
-  status: 'sent' | 'failed' | 'resent';
-  sent_at: Date;
-}
-
 export const createUser = async (email: string, password: string, role: string, locations: string[], createdBy: string): Promise<User> => {
   const hashedPassword = await bcrypt.hash(password, 10);
   const userId = uuidv4();
@@ -147,22 +104,13 @@ export const resetPassword = async (token: string, newPassword: string): Promise
   );
 
   return true;
+};
+
 export const UserModel = {
   createUser,
   getUserByEmail,
   getUserById,
   comparePasswords,
   createTemporaryToken,
-  resetPassword,
-  getUsersByLocation,
-  getLocations,
-  createLocation,
-  getUserLocations,
-  createCustomButton,
-  getButtonsForUser,
-  setButtonPermissions,
-  getEmailTemplates,
-  createEmailTemplate,
-  sendBulkEmails,
-  UserRole
+  resetPassword
 };
