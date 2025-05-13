@@ -3,7 +3,7 @@
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
     "target": "ES2020",
     "module": "commonjs",
     "outDir": "./dist",
