@@ -1,5 +1,7 @@
+// backend/src/config/logger.ts
 import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
+import path from 'path';
 
 const { combine, timestamp, printf, colorize, errors } = winston.format;
 
@@ -7,8 +9,11 @@ const logFormat = printf(({ level, message, timestamp, stack }) => {
   return `${timestamp} ${level}: ${stack || message}`;
 });
 
+// Stelle sicher, dass Logs-Verzeichnis relativ zum Projektverzeichnis ist
+const logsDir = path.join(process.cwd(), 'logs');
+
 const logger = winston.createLogger({
-  level: 'info',
+  level: process.env.LOG_LEVEL || 'info',
   format: combine(
     timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     errors({ stack: true }),
@@ -16,7 +21,8 @@ const logger = winston.createLogger({
   ),
   transports: [
     new DailyRotateFile({
-      filename: 'logs/application-%DATE%.log',
+      dirname: logsDir,
+      filename: 'application-%DATE%.log',
       datePattern: 'YYYY-MM-DD',
       zippedArchive: true,
       maxSize: '20m',
@@ -28,7 +34,8 @@ const logger = winston.createLogger({
   ],
   exceptionHandlers: [
     new DailyRotateFile({
-      filename: 'logs/exceptions-%DATE%.log',
+      dirname: logsDir,
+      filename: 'exceptions-%DATE%.log',
       datePattern: 'YYYY-MM-DD',
       zippedArchive: true,
       maxSize: '20m',
@@ -37,6 +44,7 @@ const logger = winston.createLogger({
   ]
 });
 
+// Zusätzliche Console-Ausgabe für Nicht-Produktionsumgebungen
 if (process.env.NODE_ENV !== 'production') {
   logger.add(new winston.transports.Console({
     format: winston.format.simple()
