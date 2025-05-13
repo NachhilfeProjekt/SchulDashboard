@@ -1,13 +1,15 @@
+// backend/src/routes/authRoutes.ts
 import express from 'express';
-import { User } from '../models/User';
-import { generateToken } from '../services/authService';
-import { sendPasswordResetEmail, sendTemporaryPasswordEmail } from '../services/authService';
-import { createUser, getUserByEmail, comparePasswords, getUserLocations, resetPassword } from '../models/User';
+import { getUserByEmail, comparePasswords, getUserLocations, resetPassword, createUser } from '../models/User';
+import { generateToken, sendPasswordResetEmail, sendTemporaryPasswordEmail } from '../services/authService';
 import { v4 as uuidv4 } from 'uuid';
+import { validate } from '../middleware/validationMiddleware';
+import { loginSchema, passwordResetSchema, createUserSchema } from '../validation/user';
+import logger from '../config/logger';
 
 const router = express.Router();
 
-router.post('/login', async (req, res) => {
+router.post('/login', validate(loginSchema), async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await getUserByEmail(email);
@@ -36,7 +38,7 @@ router.post('/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error(`Login-Fehler: ${error}`);
     res.status(500).json({ message: 'Serverfehler bei der Anmeldung.' });
   }
 });
@@ -46,18 +48,15 @@ router.post('/request-password-reset', async (req, res) => {
     const { email } = req.body;
     const success = await sendPasswordResetEmail(email);
 
-    if (success) {
-      res.json({ message: 'Eine E-Mail mit Anweisungen zum Zurücksetzen des Passworts wurde gesendet, falls die E-Mail registriert ist.' });
-    } else {
-      res.status(404).json({ message: 'Kein Benutzer mit dieser E-Mail-Adresse gefunden.' });
-    }
+    // Immer eine positive Antwort geben, um keine Informationen über existierende Konten preiszugeben
+    res.json({ message: 'Falls ein Konto mit dieser E-Mail existiert, wurde eine E-Mail mit Anweisungen zum Zurücksetzen des Passworts gesendet.' });
   } catch (error) {
-    console.error('Password reset request error:', error);
+    logger.error(`Fehler bei Passwort-Zurücksetzungsanfrage: ${error}`);
     res.status(500).json({ message: 'Fehler beim Anfordern des Passwort-Zurücksetzens.' });
   }
 });
 
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', validate(passwordResetSchema), async (req, res) => {
   try {
     const { token, newPassword } = req.body;
     const success = await resetPassword(token, newPassword);
@@ -68,21 +67,27 @@ router.post('/reset-password', async (req, res) => {
       res.status(400).json({ message: 'Ungültiger oder abgelaufener Token.' });
     }
   } catch (error) {
-    console.error('Password reset error:', error);
+    logger.error(`Fehler beim Zurücksetzen des Passworts: ${error}`);
     res.status(500).json({ message: 'Fehler beim Zurücksetzen des Passworts.' });
   }
 });
 
-router.post('/create-user', async (req, res) => {
+router.post('/create-user', validate(createUserSchema), async (req, res) => {
   try {
     const { email, role, locations, createdBy } = req.body;
     
-    // Generate temporary password
-    const tempPassword = uuidv4().split('-')[0]; // Simple temporary password
+    // Prüfen, ob ein Benutzer mit dieser E-Mail bereits existiert
+    const existingUser = await getUserByEmail(email);
+    if (existingUser) {
+      return res.status(400).json({ message: 'Ein Benutzer mit dieser E-Mail existiert bereits.' });
+    }
+    
+    // Temporäres Passwort generieren
+    const tempPassword = uuidv4().split('-')[0]; // Einfaches temporäres Passwort
     
     const user = await createUser(email, tempPassword, role, locations, createdBy);
     
-    // Send temporary password email
+    // Temporäres Passwort per E-Mail senden
     await sendTemporaryPasswordEmail(email, tempPassword);
     
     res.status(201).json({ 
@@ -90,7 +95,7 @@ router.post('/create-user', async (req, res) => {
       userId: user.id
     });
   } catch (error) {
-    console.error('Create user error:', error);
+    logger.error(`Fehler beim Erstellen des Benutzers: ${error}`);
     res.status(500).json({ message: 'Fehler beim Erstellen des Benutzers.' });
   }
 });
