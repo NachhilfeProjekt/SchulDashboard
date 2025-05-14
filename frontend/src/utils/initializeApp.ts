@@ -5,7 +5,7 @@ import { updateUser, setCurrentLocation } from '../store/authSlice';
 export const initializeApp = async (dispatch: AppDispatch) => {
   try {
     const user = await getCurrentUser();
-    const locations = await getUserLocations(user.id);
+    const locations = await getUserLocations();
     
     dispatch(updateUser(user));
     
