@@ -1,89 +1,65 @@
+// frontend/src/pages/DashboardPage.tsx
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
 import axios from 'axios';
-import { Box, Button, Grid, Typography, Paper, CircularProgress } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { Box, Button, Grid, Typography, Paper, CircularProgress, Link } from '@mui/material';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const DashboardPage: React.FC = () => {
   const { user, currentLocation } = useSelector((state: RootState) => state.auth);
   const [customButtons, setCustomButtons] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
+    console.log("DashboardPage wurde geladen");
+    console.log("Aktueller Pfad:", location.pathname);
+    console.log("User:", user);
+    console.log("Standort:", currentLocation);
+    
     if (user && currentLocation) {
-      console.log('Dashboard Page geladen mit User:', user);
-      console.log('Aktueller Standort:', currentLocation);
-      
       fetchCustomButtons();
-      
-      // Sicherheits-Fallback: Nach 5 Sekunden prüfen, ob Buttons geladen wurden
-      const fallbackTimer = setTimeout(() => {
-        if (customButtons.length === 0) {
-          console.log('Keine Buttons nach Timeout - Zeige Fallback-Button');
-          setCustomButtons([{
-            id: 'timeout-fallback',
-            name: 'Fallback Button (Timeout)',
-            url: 'https://example.com',
-            location_id: currentLocation.id,
-            created_by: user.id,
-            created_at: new Date().toISOString()
-          }]);
-        }
-      }, 5000);
-      
-      return () => clearTimeout(fallbackTimer);
     }
-  }, [user, currentLocation]);
+  }, [user, currentLocation, location.pathname]);
 
   const fetchCustomButtons = async () => {
-    if (!currentLocation) {
-      console.log('Kein Standort ausgewählt');
-      return;
-    }
+    if (!currentLocation) return;
     
     setLoading(true);
-    console.log(`Versuche Buttons für Standort ${currentLocation.id} abzurufen`);
-    
-    // Token aus localStorage holen
-    const token = localStorage.getItem('schul_dashboard_token');
-    console.log('Token aus localStorage:', token ? 'Vorhanden' : 'Nicht vorhanden');
-    
-    if (!token) {
-      console.log('Kein Token vorhanden - Zeige Fallback-Button');
-      setCustomButtons([{
-        id: 'no-token-fallback',
-        name: 'Fallback Button (Kein Token)',
-        url: 'https://example.com',
-        location_id: currentLocation.id,
-        created_by: 'system',
-        created_at: new Date().toISOString()
-      }]);
-      setLoading(false);
-      return;
-    }
-    
     try {
-      // Direkte Axios-Anfrage statt API-Service
-      const response = await axios.get(
-        `https://dashboard-backend-uweg.onrender.com/api/buttons/location/${currentLocation.id}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
+      const token = localStorage.getItem('schul_dashboard_token');
+      console.log("Token für Button-Anfrage:", token ? "Vorhanden" : "Nicht vorhanden");
+      
+      if (token) {
+        try {
+          console.log(`Sende Anfrage an: https://dashboard-backend-uweg.onrender.com/api/buttons/location/${currentLocation.id}`);
+          const response = await axios.get(
+            `https://dashboard-backend-uweg.onrender.com/api/buttons/location/${currentLocation.id}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            }
+          );
+          
+          console.log("Button-API-Antwort:", response.data);
+          
+          if (response.data && Array.isArray(response.data)) {
+            setCustomButtons(response.data);
           }
+        } catch (error) {
+          console.error('Fehler beim Abrufen der Buttons:', error);
         }
-      );
+      }
       
-      console.log('Button-API-Antwort:', response.data);
-      
-      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-        setCustomButtons(response.data);
-      } else {
-        console.log('Keine Buttons in API-Antwort - Erstelle lokalen Button');
+      // Wenn keine Buttons gefunden wurden, füge Fallback hinzu
+      if (customButtons.length === 0) {
+        console.log("Keine Buttons gefunden, setze Fallback-Button");
         setCustomButtons([{
-          id: 'empty-response-fallback',
-          name: 'Fallback Button (Leere Antwort)',
+          id: 'fallback-button',
+          name: 'Beispiel Button',
           url: 'https://example.com',
           location_id: currentLocation.id,
           created_by: 'system',
@@ -91,51 +67,29 @@ const DashboardPage: React.FC = () => {
         }]);
       }
     } catch (error) {
-      console.error('Fehler beim Abrufen der Buttons:', error);
-      
-      // Fallback im Fehlerfall
-      setCustomButtons([{
-        id: 'error-fallback',
-        name: 'Fallback Button (Fehler)',
-        url: 'https://example.com',
-        location_id: currentLocation.id,
-        created_by: 'system',
-        created_at: new Date().toISOString()
-      }]);
+      console.error('Fehler in fetchCustomButtons:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Explizite Navigationsfunktion mit Logging
-  const handleNavigate = (path: string) => {
-    console.log(`Navigation zu ${path} wurde angefordert`);
+  const handleButtonClick = (path: string) => {
+    console.log(`Button für Pfad ${path} wurde geklickt`);
     try {
+      console.log(`Versuche Navigation zu ${path}`);
       navigate(path);
     } catch (error) {
-      console.error(`Fehler bei der Navigation zu ${path}:`, error);
-      // Fallback: Direktes URL-Update, falls Navigate fehlschlägt
+      console.error(`Fehler bei Navigation zu ${path}:`, error);
+      // Fallback zu direkter URL-Änderung
+      console.log(`Fallback: Verwende window.location für ${path}`);
       window.location.href = path;
     }
   };
 
-  if (!user || !currentLocation) return null;
-
-  const isDeveloper = user.role === 'developer';
-  const isLead = user.role === 'lead';
-
-  const systemButtons = [
-    { name: 'Mitarbeiter verwalten', path: '/manage-users', roles: ['developer', 'lead'] },
-    { name: 'E-Mails versenden', path: '/email', roles: ['developer', 'lead'] },
-    { name: 'Buttons verwalten', path: '/manage-buttons', roles: ['developer', 'lead'] },
-    { name: 'Leitungsaccount erstellen', path: '/create-lead', roles: ['developer'] },
-    { name: 'Admin', path: '/admin', roles: ['developer'] },
-    { name: 'Einstellungen', path: '/settings', roles: ['developer', 'lead', 'office', 'teacher'] },
-  ];
-
-  const filteredSystemButtons = systemButtons.filter(button => 
-    button.roles.includes(user.role)
-  );
+  if (!user || !currentLocation) {
+    console.log("Dashboard kann nicht gerendert werden: Benutzer oder Standort fehlt");
+    return null;
+  }
 
   return (
     <Box sx={{ p: 3 }}>
@@ -150,26 +104,123 @@ const DashboardPage: React.FC = () => {
       </Paper>
       
       <Typography variant="h5" gutterBottom>
-        System-Funktionen
+        Debug-Navigation
       </Typography>
       
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {filteredSystemButtons.map((button, index) => (
-          <Grid item xs={12} sm={6} md={4} key={index}>
+        <Grid item xs={12} sm={6} md={4}>
+          <a href="/dashboard" style={{ textDecoration: 'none' }}>
             <Button
               variant="contained"
               fullWidth
               sx={{ height: '100px' }}
-              onClick={(e) => {
-                e.preventDefault(); // Verhindert Standard-Ereignisverarbeitung
-                console.log(`Button ${button.name} wurde geklickt, navigiere zu ${button.path}`);
-                handleNavigate(button.path);
-              }}
             >
-              {button.name}
+              Link: Dashboard
             </Button>
-          </Grid>
-        ))}
+          </a>
+        </Grid>
+        <Grid item xs={12} sm={6} md={4}>
+          <a href="/manage-users" style={{ textDecoration: 'none' }}>
+            <Button
+              variant="contained"
+              fullWidth
+              sx={{ height: '100px' }}
+            >
+              Link: Mitarbeiter
+            </Button>
+          </a>
+        </Grid>
+        <Grid item xs={12} sm={6} md={4}>
+          <a href="/email" style={{ textDecoration: 'none' }}>
+            <Button
+              variant="contained"
+              fullWidth
+              sx={{ height: '100px' }}
+            >
+              Link: E-Mails
+            </Button>
+          </a>
+        </Grid>
+      </Grid>
+      
+      <Typography variant="h5" gutterBottom>
+        System-Funktionen
+      </Typography>
+      
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        {user.role === 'developer' || user.role === 'lead' ? (
+          <>
+            <Grid item xs={12} sm={6} md={4}>
+              <Button
+                variant="contained"
+                fullWidth
+                sx={{ height: '100px' }}
+                onClick={() => handleButtonClick('/manage-users')}
+              >
+                Mitarbeiter verwalten
+              </Button>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={4}>
+              <Button
+                variant="contained"
+                fullWidth
+                sx={{ height: '100px' }}
+                onClick={() => handleButtonClick('/email')}
+              >
+                E-Mails versenden
+              </Button>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={4}>
+              <Button
+                variant="contained"
+                fullWidth
+                sx={{ height: '100px' }}
+                onClick={() => handleButtonClick('/manage-buttons')}
+              >
+                Buttons verwalten
+              </Button>
+            </Grid>
+          </>
+        ) : null}
+        
+        {user.role === 'developer' ? (
+          <>
+            <Grid item xs={12} sm={6} md={4}>
+              <Button
+                variant="contained"
+                fullWidth
+                sx={{ height: '100px' }}
+                onClick={() => handleButtonClick('/create-lead')}
+              >
+                Leitungsaccount erstellen
+              </Button>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={4}>
+              <Button
+                variant="contained"
+                fullWidth
+                sx={{ height: '100px' }}
+                onClick={() => handleButtonClick('/admin')}
+              >
+                Admin
+              </Button>
+            </Grid>
+          </>
+        ) : null}
+        
+        <Grid item xs={12} sm={6} md={4}>
+          <Button
+            variant="contained"
+            fullWidth
+            sx={{ height: '100px' }}
+            onClick={() => handleButtonClick('/settings')}
+          >
+            Einstellungen
+          </Button>
+        </Grid>
       </Grid>
       
       {customButtons.length > 0 && (
@@ -181,20 +232,15 @@ const DashboardPage: React.FC = () => {
           <Grid container spacing={3}>
             {customButtons.map((button) => (
               <Grid item xs={12} sm={6} md={4} key={button.id}>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  sx={{ height: '100px' }}
-                  onClick={() => {
-                    console.log(`Öffne URL: ${button.url}`);
-                    // Explizit ein neues Fenster öffnen
-                    const newWindow = window.open(button.url, '_blank', 'noopener,noreferrer');
-                    // Sicherheitsabfrage für Popup-Blocker
-                    if (newWindow) newWindow.opener = null;
-                  }}
-                >
-                  {button.name}
-                </Button>
+                <a href={button.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    sx={{ height: '100px' }}
+                  >
+                    {button.name}
+                  </Button>
+                </a>
               </Grid>
             ))}
           </Grid>
@@ -206,6 +252,20 @@ const DashboardPage: React.FC = () => {
           <CircularProgress />
         </Box>
       )}
+      
+      <Box sx={{ mt: 4 }}>
+        <Button 
+          variant="outlined" 
+          color="error" 
+          onClick={() => {
+            console.log("Abmelden-Button geklickt");
+            localStorage.clear();
+            window.location.href = '/login';
+          }}
+        >
+          Abmelden (window.location)
+        </Button>
+      </Box>
     </Box>
   );
 };
