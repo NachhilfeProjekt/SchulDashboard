@@ -1,20 +1,15 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { AppDispatch } from './store/store';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
-import EmailPage from './pages/EmailPage';
 import ManageUsersPage from './pages/ManageUsersPage';
+import EmailPage from './pages/EmailPage';
 import ManageButtonsPage from './pages/ManageButtonsPage';
 import SettingsPage from './pages/SettingsPage';
 import AdminPage from './pages/AdminPage';
 import CreateLeadPage from './pages/CreateLeadPage';
 import PrivateRoute from './components/PrivateRoute';
-import ResetPasswordPage from './pages/ResetPasswordPage';
-import { initializeApp } from './utils/initializeApp';
-
 // AppInitializer Komponente zum Initialisieren des App-Status
 const AppInitializer: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -31,20 +26,16 @@ const App: React.FC = () => {
     <Router>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        
-        <Route element={<AppInitializer />}>
-          <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/email" element={<EmailPage />} />
-            <Route path="/manage-users" element={<ManageUsersPage />} />
-            <Route path="/manage-buttons" element={<ManageButtonsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/admin" element={<AdminPage />} />
-            <Route path="/create-lead" element={<CreateLeadPage />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Route>
+        <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/manage-users" element={<ManageUsersPage />} />
+          <Route path="/email" element={<EmailPage />} />
+          <Route path="/manage-buttons" element={<ManageButtonsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/create-lead" element={<CreateLeadPage />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Routes>
     </Router>
