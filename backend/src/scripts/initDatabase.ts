@@ -6,11 +6,11 @@ dotenv.config();
 
 // Konfiguration aus Umgebungsvariablen
 const dbConfig = {
-  user: process.env.DB_USER || 'dashboard_db_cthh_user',
-  host: process.env.DB_HOST || 'dpg-d0gbpv49c44c73fefpog-a.frankfurt-postgres.render.com',
-  database: process.env.DB_NAME || 'dashboard_db_cthh',
-  password: process.env.DB_PASSWORD || 'hWArsuzVNizlCilLT3sk35bzwqWbtaUT',
-  port: parseInt(process.env.DB_PORT || '5432'),
+  user: 'dashboard_db_cthh_user',
+  host: 'dpg-d0gbpv49c44c73fefpog-a.frankfurt-postgres.render.com',
+  database: 'dashboard_db_cthh',
+  password: 'hWArsuzVNizlCilLT3sk35bzwqWbtaUT',
+  port: 5432,
   ssl: { rejectUnauthorized: false }
 };
 
