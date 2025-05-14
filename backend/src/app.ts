@@ -11,67 +11,78 @@ import buttonRoutes from './routes/buttonRoutes';
 import emailRoutes from './routes/emailRoutes';
 import { notFound, errorHandler } from './middleware/errorMiddleware';
 import logger from './config/logger';
+import initializeDatabase from './scripts/initDatabase';
 
-// Lade Umgebungsvariablen aus .env-Datei
+// Lade Umgebungsvariablen
 dotenv.config();
 
 const app = express();
 
-// CORS für alle Origins zulassen (für Entwicklung und Tests)
-app.use(cors());
+// Einfache CORS-Konfiguration für alle Origins
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-// Logging
+// Weitere Middleware
+app.use(helmet());
 app.use(morgan('dev'));
-
-// Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Sicherheitsheader 
-// Helmet deaktivieren, da es zu CORS-Problemen führen kann
-// app.use(helmet());
-
-// Root-Route für schnelle Tests
+// Root-Route für einfache Überprüfung
 app.get('/', (req, res) => {
-  res.status(200).send('Dashboard Backend API is running');
+  res.status(200).send('Dashboard Backend API is running!');
 });
 
 // Health Check Route
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'OK',
-    timestamp: new Date().toISOString(),
-    message: 'Server is running'
+    timestamp: new Date().toISOString()
   });
 });
 
-// API-Routen mit und ohne /api Präfix für maximale Kompatibilität
-// Mit /api Präfix
+// API-Routen
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/buttons', buttonRoutes);
 app.use('/api/emails', emailRoutes);
 
-// Ohne /api Präfix für Kompatibilität
+// Alternative Routen ohne /api Präfix für maximale Kompatibilität
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/locations', locationRoutes);
 app.use('/buttons', buttonRoutes);
 app.use('/emails', emailRoutes);
 
-// Error Handling
+// Fehlerbehandlung
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 
-// Server starten
+// Server starten, wenn dies das Hauptmodul ist
 if (require.main === module) {
-  app.listen(PORT, () => {
-    logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-    logger.info(`Health check available at: http://localhost:${PORT}/health`);
-  });
+  // Initialisiere die Datenbank, bevor der Server startet
+  initializeDatabase()
+    .then(success => {
+      if (success) {
+        logger.info('Datenbank erfolgreich initialisiert.');
+      } else {
+        logger.warn('Fehler bei der Datenbank-Initialisierung. Der Server wird trotzdem gestartet.');
+      }
+      
+      // Starte den Server
+      app.listen(PORT, () => {
+        logger.info(`Server running on port ${PORT}`);
+      });
+    })
+    .catch(err => {
+      logger.error(`Fehler beim Starten des Servers: ${err}`);
+    });
 }
 
 export default app;
