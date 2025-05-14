@@ -1,47 +1,64 @@
 // frontend/src/pages/LoginPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
 import { 
   Box, Button, Container, TextField, Typography, Paper, Avatar, 
   Alert, CircularProgress, Snackbar
 } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import WifiOffIcon from '@mui/icons-material/WifiOff';
-import { attemptLogin, findWorkingBackendUrl } from '../services/auth';
+import axios from 'axios';
+import { loginSuccess } from '../store/authSlice';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('admin@example.com');
   const [password, setPassword] = useState('admin123');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [connecting, setConnecting] = useState(true);
+  const [connecting, setConnecting] = useState(false);
   const [offlineMode, setOfflineMode] = useState(false);
   const [notification, setNotification] = useState('');
+  const [debugMode, setDebugMode] = useState(false);
   
   const dispatch = useDispatch();
-  const navigate = useNavigate();
 
-  // Beim Laden der Seite Backend-Verbindung testen
-  useEffect(() => {
-    const checkBackendConnection = async () => {
-      setConnecting(true);
-      try {
-        const baseUrl = await findWorkingBackendUrl();
-        if (!baseUrl) {
-          setOfflineMode(true);
-          setNotification('Backend-Server nicht erreichbar. Offline-Modus verfügbar.');
-        }
-      } catch (err) {
-        setOfflineMode(true);
-        setNotification('Backend-Server nicht erreichbar. Offline-Modus verfügbar.');
-      } finally {
-        setConnecting(false);
-      }
-    };
+  // Debug-Funktionalität
+  const toggleDebugMode = () => {
+    setDebugMode(!debugMode);
+    console.log('Debug-Modus:', !debugMode ? 'aktiviert' : 'deaktiviert');
     
-    checkBackendConnection();
-  }, []);
+    // Debug-Panel im DOM anzeigen/verstecken
+    const debugPanel = document.getElementById('debug-panel');
+    if (debugPanel) {
+      debugPanel.style.display = !debugMode ? 'block' : 'none';
+    } else {
+      // Debug-Panel erstellen, wenn es nicht existiert
+      const panel = document.createElement('div');
+      panel.id = 'debug-panel';
+      panel.style.position = 'fixed';
+      panel.style.bottom = '10px';
+      panel.style.right = '10px';
+      panel.style.maxWidth = '80%';
+      panel.style.maxHeight = '60%';
+      panel.style.overflowY = 'auto';
+      panel.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+      panel.style.color = '#00ff00';
+      panel.style.fontFamily = 'monospace';
+      panel.style.padding = '10px';
+      panel.style.borderRadius = '4px';
+      panel.style.zIndex = '9999';
+      
+      const heading = document.createElement('h4');
+      heading.textContent = 'Debug Log';
+      
+      const logArea = document.createElement('pre');
+      logArea.id = 'debug-log';
+      
+      panel.appendChild(heading);
+      panel.appendChild(logArea);
+      document.body.appendChild(panel);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -49,42 +66,115 @@ const LoginPage = () => {
     setError('');
     
     try {
-      const result = await attemptLogin(email, password, dispatch);
+      console.log('Login-Versuch mit:', { email, password: '***' });
       
-      if (result.success) {
-        if (result.offlineMode) {
-          setNotification('Offline-Modus aktiviert. Eingeschränkte Funktionalität verfügbar.');
-        }
-        navigate('/dashboard');
-      } else {
-        setError(result.message);
+      // Direkter Login-Versuch
+      const response = await axios.post('https://dashboard-backend-uweg.onrender.com/api/auth/login', {
+        email,
+        password
+      });
+      
+      console.log('Login erfolgreich:', response.data);
+      
+      // Token und Benutzerdaten im localStorage speichern
+      localStorage.setItem('schul_dashboard_token', response.data.token);
+      localStorage.setItem('schul_dashboard_user', JSON.stringify(response.data.user));
+      localStorage.setItem('schul_dashboard_locations', JSON.stringify(response.data.locations || []));
+      
+      if (response.data.locations && response.data.locations.length > 0) {
+        localStorage.setItem('schul_dashboard_current_location', JSON.stringify(response.data.locations[0]));
       }
-    } catch (err) {
-      setError('Ein unerwarteter Fehler ist aufgetreten.');
-      console.error('Login error:', err);
+      
+      // Redux-Store aktualisieren
+      dispatch(loginSuccess({
+        token: response.data.token,
+        user: response.data.user,
+        locations: response.data.locations || []
+      }));
+      
+      // Weiterleitung zum Dashboard
+      window.location.href = '/dashboard';
+    } catch (error) {
+      console.error('Login-Fehler:', error);
+      
+      if (error.response) {
+        setError(error.response.data.message || 'Anmeldung fehlgeschlagen.');
+      } else if (error.request) {
+        setError('Keine Antwort vom Server. Überprüfen Sie Ihre Internetverbindung.');
+        setOfflineMode(true);
+      } else {
+        setError('Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOfflineMode = async () => {
+  const handleOfflineMode = () => {
     setLoading(true);
     setError('');
     
     try {
-      // Verwende die Standard-Anmeldedaten für den Offline-Modus
-      const result = await attemptLogin('admin@example.com', 'admin123', dispatch);
+      console.log('Offline-Modus wird aktiviert...');
       
-      if (result.success) {
-        setNotification('Offline-Modus aktiviert. Eingeschränkte Funktionalität verfügbar.');
-        navigate('/dashboard');
-      } else {
-        setError(result.message);
-      }
-    } catch (err) {
+      // Standard-Benutzer für Offline-Modus
+      const mockUser = {
+        id: '11111111-1111-1111-1111-111111111111',
+        email: 'admin@example.com',
+        role: 'developer',
+        createdAt: new Date().toISOString()
+      };
+      
+      const mockLocations = [
+        {
+          id: '22222222-2222-2222-2222-222222222222',
+          name: 'Hauptstandort',
+          createdAt: new Date().toISOString()
+        }
+      ];
+      
+      const mockToken = 'offline-mock-token';
+      
+      // Daten im localStorage speichern
+      localStorage.setItem('schul_dashboard_token', mockToken);
+      localStorage.setItem('schul_dashboard_user', JSON.stringify(mockUser));
+      localStorage.setItem('schul_dashboard_locations', JSON.stringify(mockLocations));
+      localStorage.setItem('schul_dashboard_current_location', JSON.stringify(mockLocations[0]));
+      
+      // Redux-Store aktualisieren
+      dispatch(loginSuccess({
+        token: mockToken,
+        user: mockUser,
+        locations: mockLocations
+      }));
+      
+      setNotification('Offline-Modus aktiviert. Eingeschränkte Funktionalität verfügbar.');
+      
+      // Weiterleitung zum Dashboard
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 1000);
+    } catch (error) {
+      console.error('Fehler beim Aktivieren des Offline-Modus:', error);
       setError('Fehler beim Aktivieren des Offline-Modus.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const testBackendConnection = async () => {
+    setConnecting(true);
+    try {
+      const result = await axios.get('https://dashboard-backend-uweg.onrender.com/health', { timeout: 5000 });
+      console.log('Backend-Verbindungstest:', result.data);
+      setNotification(`Verbindung zum Backend erfolgreich (Status: ${result.status})`);
+      setOfflineMode(false);
+    } catch (error) {
+      console.error('Backend-Verbindungstest fehlgeschlagen:', error);
+      setNotification('Verbindung zum Backend nicht möglich. Offline-Modus wird empfohlen.');
+      setOfflineMode(true);
+    } finally {
+      setConnecting(false);
     }
   };
 
@@ -116,7 +206,7 @@ const LoginPage = () => {
           <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <CircularProgress />
             <Typography variant="body2" sx={{ mt: 2 }}>
-              Verbindung zum Server wird hergestellt...
+              Verbindung zum Server wird getestet...
             </Typography>
           </Box>
         ) : (
@@ -172,16 +262,35 @@ const LoginPage = () => {
                   {loading ? <CircularProgress size={24} /> : 'Anmelden'}
                 </Button>
                 
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    onClick={handleOfflineMode}
+                    disabled={loading}
+                    startIcon={<WifiOffIcon />}
+                  >
+                    Offline-Modus
+                  </Button>
+                  
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={toggleDebugMode}
+                    disabled={loading}
+                  >
+                    {debugMode ? 'Debug aus' : 'Debug ein'}
+                  </Button>
+                </Box>
+                
                 <Button
                   fullWidth
-                  variant="outlined"
-                  color="secondary"
-                  onClick={handleOfflineMode}
-                  disabled={loading}
-                  startIcon={<WifiOffIcon />}
-                  sx={{ mb: 1 }}
+                  variant="text"
+                  onClick={testBackendConnection}
+                  disabled={loading || connecting}
+                  size="small"
                 >
-                  Offline-Modus
+                  Backend-Verbindung testen
                 </Button>
               </Box>
             </Paper>
