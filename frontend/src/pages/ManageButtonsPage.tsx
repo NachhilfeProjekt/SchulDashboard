@@ -2,20 +2,43 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
-import { getButtonsForUser, createCustomButton, setButtonPermissions } from '../services/api';
+import { getButtonsForUser, createCustomButton, setButtonPermissions, deleteButton, getUsersByLocation } from '../services/api';
 import { 
   Box, Button, Typography, Paper, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Dialog, DialogTitle, 
   DialogContent, DialogActions, TextField, FormControl, 
   InputLabel, Select, MenuItem, Checkbox, List, ListItem, 
-  ListItemText, CircularProgress, Alert
+  ListItemText, CircularProgress, Alert, Tab, Tabs
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+const TabPanel = (props: TabPanelProps) => {
+  const { children, value, index, ...other } = props;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
+  );
+};
 
 const ManageButtonsPage: React.FC = () => {
   const { user, currentLocation } = useSelector((state: RootState) => state.auth);
   const [buttons, setButtons] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [permissionsDialog, setPermissionsDialog] = useState(false);
   const [selectedButton, setSelectedButton] = useState<any>(null);
@@ -25,13 +48,18 @@ const ManageButtonsPage: React.FC = () => {
     locationId: currentLocation?.id || ''
   });
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [tabValue, setTabValue] = useState(0);
+  const [confirmDeleteDialog, setConfirmDeleteDialog] = useState(false);
+  const [buttonToDelete, setButtonToDelete] = useState<any>(null);
 
   useEffect(() => {
     if (currentLocation) {
       fetchButtons();
+      fetchUsers();
     }
   }, [currentLocation]);
 
@@ -47,6 +75,18 @@ const ManageButtonsPage: React.FC = () => {
       setError('Fehler beim Laden der Buttons.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    if (!currentLocation) return;
+    
+    try {
+      const data = await getUsersByLocation(currentLocation.id);
+      setUsers(data);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      // Silent error - nicht kritisch für die Hauptfunktionalität
     }
   };
 
@@ -77,6 +117,7 @@ const ManageButtonsPage: React.FC = () => {
   const handleOpenPermissions = (button: any) => {
     setSelectedButton(button);
     setSelectedRoles([]);
+    setSelectedUsers([]);
     setPermissionsDialog(true);
   };
 
@@ -88,7 +129,10 @@ const ManageButtonsPage: React.FC = () => {
     setSuccess('');
     
     try {
-      await setButtonPermissions(selectedButton.id, { roles: selectedRoles });
+      await setButtonPermissions(selectedButton.id, { 
+        roles: selectedRoles,
+        users: selectedUsers
+      });
       setPermissionsDialog(false);
       setSuccess('Berechtigungen erfolgreich gespeichert.');
       
@@ -110,6 +154,48 @@ const ManageButtonsPage: React.FC = () => {
         return [...prev, role];
       }
     });
+  };
+
+  const toggleUser = (userId: string) => {
+    setSelectedUsers(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId);
+      } else {
+        return [...prev, userId];
+      }
+    });
+  };
+
+  const handleDeleteButtonClick = (button: any) => {
+    setButtonToDelete(button);
+    setConfirmDeleteDialog(true);
+  };
+
+  const handleDeleteButton = async () => {
+    if (!buttonToDelete) return;
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      await deleteButton(buttonToDelete.id);
+      setConfirmDeleteDialog(false);
+      setButtonToDelete(null);
+      setSuccess('Button erfolgreich gelöscht.');
+      
+      // Refresh buttons
+      await fetchButtons();
+    } catch (error) {
+      console.error('Error deleting button:', error);
+      setError('Fehler beim Löschen des Buttons.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
   };
 
   if (!user || !currentLocation) return null;
@@ -142,62 +228,99 @@ const ManageButtonsPage: React.FC = () => {
         </Alert>
       )}
       
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />}
-          onClick={() => setOpenDialog(true)}
-          disabled={loading}
-        >
-          Neuen Button erstellen
-        </Button>
-      </Box>
+      <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 3 }}>
+        <Tab label="Buttons" />
+        <Tab label="Berechtigungen" />
+      </Tabs>
       
-      <Paper sx={{ p: 3 }}>
-        {loading && !openDialog && !permissionsDialog && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-            <CircularProgress />
-          </Box>
-        )}
+      <TabPanel value={tabValue} index={0}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />}
+            onClick={() => setOpenDialog(true)}
+            disabled={loading}
+          >
+            Neuen Button erstellen
+          </Button>
+        </Box>
         
-        {!loading && (
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>URL</TableCell>
-                  <TableCell align="right">Aktionen</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {buttons.map((button) => (
-                  <TableRow key={button.id}>
-                    <TableCell>{button.name}</TableCell>
-                    <TableCell>{button.url}</TableCell>
-                    <TableCell align="right">
-                      <Button 
-                        variant="outlined" 
-                        startIcon={<EditIcon />}
-                        onClick={() => handleOpenPermissions(button)}
-                        disabled={loading}
-                      >
-                        Berechtigungen
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {buttons.length === 0 && (
+        <Paper sx={{ p: 3 }}>
+          {loading && !openDialog && !permissionsDialog && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+              <CircularProgress />
+            </Box>
+          )}
+          
+          {!loading && (
+            <TableContainer>
+              <Table>
+                <TableHead>
                   <TableRow>
-                    <TableCell colSpan={3} align="center">Keine Buttons gefunden</TableCell>
+                    <TableCell>Name</TableCell>
+                    <TableCell>URL</TableCell>
+                    <TableCell align="right">Aktionen</TableCell>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </Paper>
+                </TableHead>
+                <TableBody>
+                  {buttons.map((button) => (
+                    <TableRow key={button.id}>
+                      <TableCell>{button.name}</TableCell>
+                      <TableCell>
+                        <a href={button.url} target="_blank" rel="noopener noreferrer">
+                          {button.url}
+                        </a>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button 
+                          variant="outlined" 
+                          startIcon={<EditIcon />}
+                          onClick={() => handleOpenPermissions(button)}
+                          disabled={loading}
+                          sx={{ mr: 1 }}
+                        >
+                          Berechtigungen
+                        </Button>
+                        <Button 
+                          variant="outlined" 
+                          color="error"
+                          startIcon={<DeleteIcon />}
+                          onClick={() => handleDeleteButtonClick(button)}
+                          disabled={loading}
+                        >
+                          Löschen
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {buttons.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} align="center">Keine Buttons gefunden</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Paper>
+      </TabPanel>
       
+      <TabPanel value={tabValue} index={1}>
+        <Typography variant="h6" gutterBottom>
+          Button-Berechtigungen
+        </Typography>
+        
+        <Typography variant="body1" gutterBottom>
+          In diesem Bereich können Sie festlegen, welche Rollen und Benutzer Zugriff auf bestimmte Buttons haben.
+          Wählen Sie einen Button in der Button-Tabelle aus und klicken Sie auf "Berechtigungen", um die Zugriffsrechte zu verwalten.
+        </Typography>
+        
+        <Typography variant="body2" sx={{ mt: 2 }}>
+          <strong>Hinweis:</strong> Entwickler haben immer Zugriff auf alle Buttons. Leitungen können Buttons nur für ihre eigenen Standorte erstellen und verwalten.
+        </Typography>
+      </TabPanel>
+      
+      {/* Button erstellen Dialog */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Neuen Button erstellen</DialogTitle>
         <DialogContent>
@@ -218,6 +341,7 @@ const ManageButtonsPage: React.FC = () => {
               onChange={(e) => setNewButton({...newButton, url: e.target.value})}
               sx={{ mb: 3 }}
               disabled={loading}
+              placeholder="https://example.com"
             />
           </Box>
         </DialogContent>
@@ -235,6 +359,7 @@ const ManageButtonsPage: React.FC = () => {
         </DialogActions>
       </Dialog>
       
+      {/* Berechtigungen Dialog */}
       <Dialog open={permissionsDialog} onClose={() => setPermissionsDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Berechtigungen für {selectedButton?.name}</DialogTitle>
         <DialogContent>
@@ -268,22 +393,34 @@ const ManageButtonsPage: React.FC = () => {
               <ListItemText primary="Leitung" />
             </ListItem>
           </List>
+          
+          <Typography variant="subtitle1" sx={{ mt: 3, mb: 2 }}>
+            Oder wählen Sie spezifische Benutzer aus:
+          </Typography>
+          
+          <List sx={{ maxHeight: 200, overflow: 'auto' }}>
+            {users.map((user) => (
+              <ListItem key={user.id}>
+                <Checkbox
+                  checked={selectedUsers.includes(user.id)}
+                  onChange={() => toggleUser(user.id)}
+                  disabled={loading}
+                />
+                <ListItemText 
+                  primary={user.email} 
+                  secondary={
+                    user.role === 'developer' ? 'Entwickler' :
+                    user.role === 'lead' ? 'Leitung' :
+                    user.role === 'office' ? 'Büro' :
+                    'Lehrer'
+                  } 
+                />
+              </ListItem>
+            ))}
+            {users.length === 0 && (
+              <ListItem>
+                <ListItemText primary="Keine Benutzer verfügbar" />
+              </ListItem>
+            )}
+          </List>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPermissionsDialog(false)} disabled={loading}>
-            Abbrechen
-          </Button>
-          <Button 
-            variant="contained" 
-            onClick={handleSavePermissions}
-            disabled={loading}
-          >
-            Speichern
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
-  );
-};
-
-export default ManageButtonsPage;
