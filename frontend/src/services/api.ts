@@ -1,29 +1,87 @@
-// In frontend/src/services/api.ts aktualisiere die getButtonsForUser-Funktion
-export const getButtonsForUser = async (locationId: string) => {
+// frontend/src/services/api.ts
+import axios from 'axios';
+
+// Konstante API-URL für alle Anfragen
+const API_URL = 'https://dashboard-backend-uweg.onrender.com/api';
+
+// Konfiguriere Axios mit Basiskonfiguration
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Request Interceptor für das Hinzufügen des Tokens
+api.interceptors.request.use((config) => {
   const token = localStorage.getItem('schul_dashboard_token');
-  
-  console.log(`getButtonsForUser wird aufgerufen mit locationId=${locationId}`);
-  console.log(`Token vorhanden: ${!!token}`);
-  
-  if (!token) {
-    console.error('Kein Token vorhanden für Button-Anfrage');
-    throw new Error('Nicht authentifiziert');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
-  
+  return config;
+});
+
+// Authentifizierung
+export const login = async (email: string, password: string) => {
   try {
-    const response = await axios.get(`${API_URL}/buttons/location/${locationId}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    console.log(`Button-Anfrage erfolgreich: ${response.data.length} Buttons erhalten`);
+    const response = await api.post('/auth/login', { email, password });
+    return response.data;
+  } catch (error) {
+    console.error('Login error:', error);
+    throw error;
+  }
+};
+
+export const requestPasswordReset = async (email: string) => {
+  const response = await api.post('/auth/request-password-reset', { email });
+  return response.data;
+};
+
+export const resetPassword = async (token: string, newPassword: string) => {
+  const response = await api.post('/auth/reset-password', { token, newPassword });
+  return response.data;
+};
+
+// Benutzer
+export const createUser = async (email: string, role: string, locations: string[]) => {
+  const response = await api.post('/auth/create-user', { email, role, locations });
+  return response.data;
+};
+
+export const getCurrentUser = async () => {
+  const response = await api.get('/users/me');
+  return response.data;
+};
+
+export const getUsersByLocation = async (locationId: string) => {
+  const response = await api.get(`/users/location/${locationId}`);
+  return response.data;
+};
+
+// Standorte
+export const getLocations = async () => {
+  const response = await api.get('/locations');
+  return response.data;
+};
+
+export const getUserLocations = async () => {
+  const response = await api.get('/locations/my-locations');
+  return response.data;
+};
+
+export const createLocation = async (name: string) => {
+  const response = await api.post('/locations', { name });
+  return response.data;
+};
+
+// Buttons
+export const getButtonsForUser = async (locationId: string) => {
+  try {
+    const response = await api.get(`/buttons/location/${locationId}`);
     return response.data;
   } catch (error) {
     console.error('Fehler beim Abrufen der Buttons:', error);
-    
-    // Fallback: Wenn die API-Anfrage fehlschlägt, erstelle einen lokalen Test-Button
-    console.log('Erstelle lokalen Test-Button als Fallback');
+    // Fallback für Fehlerfälle
     return [{
       id: 'local-test-button',
       name: 'Test-Button (lokal)',
@@ -34,11 +92,46 @@ export const getButtonsForUser = async (locationId: string) => {
     }];
   }
 };
-    
-    console.log(`Button-Anfrage erfolgreich: ${response.data.length} Buttons erhalten`);
-    return response.data;
-  } catch (error) {
-    console.error('Fehler beim Abrufen der Buttons:', error);
-    throw new Error('Fehler beim Abrufen der Buttons');
-  }
+
+export const createCustomButton = async (name: string, url: string, locationId: string) => {
+  const response = await api.post('/buttons', { name, url, locationId });
+  return response.data;
 };
+
+export const setButtonPermissions = async (buttonId: string, permissions: any) => {
+  const response = await api.post(`/buttons/${buttonId}/permissions`, { permissions });
+  return response.data;
+};
+
+// E-Mails
+export const getEmailTemplates = async (locationId: string) => {
+  const response = await api.get(`/emails/templates/location/${locationId}`);
+  return response.data;
+};
+
+export const createEmailTemplate = async (name: string, subject: string, body: string, locationId: string) => {
+  const response = await api.post('/emails/templates', { name, subject, body, locationId });
+  return response.data;
+};
+
+export const sendBulkEmails = async (templateId: string, recipients: {email: string, name: string}[]) => {
+  const response = await api.post('/emails/send-bulk', { templateId, recipients });
+  return response.data;
+};
+
+export const getSentEmails = async (locationId: string) => {
+  const response = await api.get(`/emails/sent?locationId=${locationId}`);
+  return response.data;
+};
+
+export const resendFailedEmails = async (emailIds: string[]) => {
+  const response = await api.post('/emails/resend', { emailIds });
+  return response.data;
+};
+
+export const deactivateUser = async (userId: string) => {
+  const response = await api.delete(`/users/${userId}`);
+  return response.data;
+};
+
+export default api;
