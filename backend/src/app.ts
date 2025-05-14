@@ -14,7 +14,9 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ['https://schuldashboard-frontend.onrender.com', 'http://localhost:3000'],
+  origin: '*', // Während der Entwicklung, für Produktion einschränken
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
 app.use(helmet());
