@@ -1,3 +1,4 @@
+# Ändere .render.yaml, um die Datenbank-Umgebungsvariablen korrekt zu setzen
 services:
   - name: dashboard-backend
     type: web
@@ -17,3 +18,21 @@ services:
         value: production
       - key: NPM_CONFIG_PRODUCTION
         value: false
+      - key: DB_HOST
+        value: dpg-d0gbpv49c44c73fefpog-a.frankfurt-postgres.render.com
+      - key: DB_NAME
+        value: dashboard_db_cthh
+      - key: DB_USER
+        value: dashboard_db_cthh_user
+      - key: DB_PASSWORD
+        value: hWArsuzVNizlCilLT3sk35bzwqWbtaUT
+      - key: DB_PORT
+        value: 5432
+      - key: DB_SSL
+        value: true
+      - key: JWT_SECRET
+        value: ein-sicherer-geheimer-schluessel-dashboard-system
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: FRONTEND_URL
+        value: https://dashboard-frontend-p693.onrender.com
