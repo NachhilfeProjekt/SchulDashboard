@@ -297,6 +297,90 @@
   </div>
 
   <script>
+
+    function setupApiDebugging() {
+  // Original-Methode speichern
+  const originalFetch = window.fetch;
+  
+  // Fetch überschreiben
+  window.fetch = async function(url, options) {
+    const startTime = new Date();
+    debug.log(`API-Anfrage: ${options?.method || 'GET'} ${url}`, options);
+    
+    try {
+      const response = await originalFetch(url, options);
+      
+      // Kopie der Response erstellen
+      const clone = response.clone();
+      
+      try {
+        // Nur JSON-Responses loggen
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await clone.json();
+          const endTime = new Date();
+          const duration = endTime - startTime;
+          
+          debug.log(`API-Antwort (${duration}ms): ${response.status} ${url}`, data);
+        } else {
+          debug.log(`API-Antwort: ${response.status} ${url} (kein JSON)`);
+        }
+      } catch (e) {
+        debug.log(`API-Antwort: ${response.status} ${url} (Fehler beim Parsen)`);
+      }
+      
+      return response;
+    } catch (error) {
+      debug.log(`API-Fehler: ${url}`, error);
+      throw error;
+    }
+  };
+  
+  // XMLHttpRequest überschreiben
+  const originalXHR = window.XMLHttpRequest.prototype.open;
+  
+  window.XMLHttpRequest.prototype.open = function(method, url) {
+    this.addEventListener('load', function() {
+      debug.log(`XHR-Antwort: ${method} ${url}`, this.status);
+      try {
+        if (this.responseText) {
+          const contentType = this.getResponseHeader('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            debug.log(`XHR-Daten: ${url}`, JSON.parse(this.responseText));
+          }
+        }
+      } catch (e) {
+        debug.log(`XHR-Fehler beim Parsen: ${url}`, e);
+      }
+    });
+    
+    this.addEventListener('error', function() {
+      debug.log(`XHR-Fehler: ${method} ${url}`);
+    });
+    
+    debug.log(`XHR-Anfrage: ${method} ${url}`);
+    return originalXHR.apply(this, arguments);
+  };
+  
+  debug.log('API-Debugging aktiviert');
+}
+
+// Debug aktivieren, wenn der Debug-Button geklickt wird
+document.getElementById('debug-toggle').addEventListener('click', function() {
+  debug.toggleDebug();
+  
+  // API-Debugging nur aktivieren, wenn Debug-Modus an ist
+  if (debug.enabled) {
+    setupApiDebugging();
+  }
+});
+
+// Debug-Modus automatisch aktivieren, wenn URL-Parameter vorhanden
+if (window.location.search.includes('debug=true')) {
+  debug.toggleDebug();
+  setupApiDebugging();
+}
+    
     // Konfiguration mit mehreren Backend-URLs für CORS-Probleme
     const config = {
       backendOptions: [
