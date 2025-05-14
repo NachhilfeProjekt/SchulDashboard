@@ -88,31 +88,59 @@ router.post('/reset-password', validate(passwordResetSchema), async (req, res) =
   }
 });
 
+// backend/src/routes/authRoutes.ts (Nur die create-user Route)
+
 router.post('/create-user', validate(createUserSchema), async (req, res) => {
   try {
     const { email, role, locations } = req.body;
     const createdBy = req.user?.userId || '11111111-1111-1111-1111-111111111111'; // Default admin ID
     
+    // Detaillierte Logs für bessere Fehlerbehebung
+    console.log(`Erstelle Benutzer: email=${email}, role=${role}, locations=${JSON.stringify(locations)}, createdBy=${createdBy}`);
+    
     // Prüfen, ob ein Benutzer mit dieser E-Mail bereits existiert
-    const existingUser = await getUserByEmail(email);
-    if (existingUser) {
-      return res.status(400).json({ message: 'Ein Benutzer mit dieser E-Mail existiert bereits.' });
+    try {
+      const existingUser = await getUserByEmail(email);
+      if (existingUser) {
+        console.log(`E-Mail ${email} existiert bereits`);
+        return res.status(400).json({ message: 'Ein Benutzer mit dieser E-Mail existiert bereits.' });
+      }
+    } catch (checkError) {
+      console.error(`Fehler beim Prüfen der E-Mail-Existenz: ${checkError}`);
+      return res.status(500).json({ message: 'Fehler beim Prüfen der Benutzerexistenz.' });
     }
     
     // Temporäres Passwort generieren
     const tempPassword = uuidv4().split('-')[0]; // Einfaches temporäres Passwort
+    console.log(`Temporäres Passwort generiert für ${email}: [Passwort ausgeblendet für Sicherheit]`);
     
-    const user = await createUser(email, tempPassword, role, locations, createdBy);
-    
-    // Temporäres Passwort per E-Mail senden
-    await sendTemporaryPasswordEmail(email, tempPassword);
-    
-    res.status(201).json({ 
-      message: 'Benutzer erfolgreich erstellt. Ein temporäres Passwort wurde per E-Mail versendet.',
-      userId: user.id
-    });
+    try {
+      const user = await createUser(email, tempPassword, role, locations, createdBy);
+      console.log(`Benutzer ${email} erfolgreich erstellt mit ID: ${user.id}`);
+      
+      // Temporäres Passwort per E-Mail senden
+      try {
+        await sendTemporaryPasswordEmail(email, tempPassword);
+        console.log(`Temporäres Passwort erfolgreich per E-Mail an ${email} gesendet`);
+      } catch (emailError) {
+        console.error(`Fehler beim Senden des temporären Passworts: ${emailError}`);
+        // Wir geben trotzdem einen Erfolg zurück, warnen aber über das E-Mail-Problem
+        return res.status(201).json({ 
+          message: 'Benutzer erfolgreich erstellt, aber das temporäre Passwort konnte nicht per E-Mail versendet werden.',
+          userId: user.id
+        });
+      }
+      
+      res.status(201).json({ 
+        message: 'Benutzer erfolgreich erstellt. Ein temporäres Passwort wurde per E-Mail versendet.',
+        userId: user.id
+      });
+    } catch (createError) {
+      console.error(`Fehler beim Erstellen des Benutzers: ${createError}`);
+      res.status(500).json({ message: `Fehler beim Erstellen des Benutzers: ${createError.message}` });
+    }
   } catch (error) {
-    console.error(`Fehler beim Erstellen des Benutzers: ${error}`);
+    console.error(`Hauptfehler beim Erstellen des Benutzers: ${error}`);
     res.status(500).json({ message: 'Fehler beim Erstellen des Benutzers.' });
   }
 });
