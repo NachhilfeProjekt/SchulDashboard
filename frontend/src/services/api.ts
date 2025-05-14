@@ -1,39 +1,74 @@
-import axios from 'axios';
+// frontend/src/services/api.ts
+import axios, { AxiosRequestConfig } from 'axios';
 
-// Konstante API-URL für alle Anfragen
-const API_URL = 'https://dashboard-backend-uweg.onrender.com/api';
+// Konstante für den Token-Schlüssel
+export const TOKEN_KEY = 'schul_dashboard_token';
 
-// Konfiguriere Axios mit Basiskonfiguration
+// API-URL aus .env oder fallback
+const API_URL = import.meta.env.VITE_API_URL || 'https://dashboard-backend-uweg.onrender.com/api';
+
+// Initialisiere Axios mit Basiskonfiguration
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 15000, // 15 Sekunden Timeout für alle Anfragen
 });
 
 // Request Interceptor für das Hinzufügen des Tokens
-api.interceptors.request.use((config) => {
-  // Verwende "schul_dashboard_token" als Schlüssel
-  const token = localStorage.getItem('schul_dashboard_token');
+api.interceptors.request.use((config: AxiosRequestConfig) => {
+  const token = localStorage.getItem(TOKEN_KEY);
   
   console.log('Token für API-Anfrage:', token ? 'Vorhanden' : 'Nicht vorhanden');
   
   if (token) {
-    // Setze den Authorization-Header mit dem Bearer-Token
+    config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
   return config;
 });
 
+// Response Interceptor für bessere Fehlerbehandlung
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Verbesserte Fehlerbehandlung
+    if (error.response) {
+      // Der Server hat geantwortet mit einem Statuscode außerhalb des 2xx-Bereichs
+      console.error('API Error Response:', {
+        status: error.response.status,
+        data: error.response.data,
+        url: error.config?.url
+      });
+      
+      // 401-Fehler (Unauthorized) -> automatisches Logout
+      if (error.response.status === 401) {
+        console.log('401 Unauthorized - Auto-Logout');
+        // Optional: Automatischer Logout
+        // localStorage.removeItem(TOKEN_KEY);
+        // window.location.href = '/login';
+      }
+    } else if (error.request) {
+      // Die Anfrage wurde gestellt, aber keine Antwort erhalten
+      console.error('API Error Request:', {
+        request: error.request,
+        url: error.config?.url
+      });
+    } else {
+      // Beim Einrichten der Anfrage ist ein Fehler aufgetreten
+      console.error('API Error Setup:', error.message);
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
 // Authentifizierung
 export const login = async (email: string, password: string) => {
-  try {
-    const response = await api.post('/auth/login', { email, password });
-    return response.data;
-  } catch (error) {
-    console.error('Login error:', error);
-    throw error;
-  }
+  const response = await api.post('/auth/login', { email, password });
+  return response.data;
 };
 
 export const requestPasswordReset = async (email: string) => {
@@ -81,69 +116,6 @@ export const createLocation = async (name: string) => {
 // Buttons
 export const getButtonsForUser = async (locationId: string) => {
   try {
-    const response = await api.get(`/buttons/location/${locationId}`);
-    return response.data;
-  } catch (error) {
-    console.error('Fehler beim Abrufen der Buttons:', error);
-    // Fallback für Fehlerfälle
-    return [{
-      id: 'local-test-button',
-      name: 'Test-Button (lokal)',
-      url: 'https://example.com',
-      location_id: locationId,
-      created_by: 'system',
-      created_at: new Date().toISOString()
-    }];
-  }
-};
-
-export const createCustomButton = async (name: string, url: string, locationId: string) => {
-  const response = await api.post('/buttons', { name, url, locationId });
-  return response.data;
-};
-
-export const setButtonPermissions = async (buttonId: string, permissions: any) => {
-  const response = await api.post(`/buttons/${buttonId}/permissions`, { permissions });
-  return response.data;
-};
-
-// E-Mails
-export const getEmailTemplates = async (locationId: string) => {
-  const response = await api.get(`/emails/templates/location/${locationId}`);
-  return response.data;
-};
-
-export const createEmailTemplate = async (name: string, subject: string, body: string, locationId: string) => {
-  const response = await api.post('/emails/templates', { name, subject, body, locationId });
-  return response.data;
-};
-
-export const sendBulkEmails = async (templateId: string, recipients: {email: string, name: string}[]) => {
-  const response = await api.post('/emails/send-bulk', { templateId, recipients });
-  return response.data;
-};
-
-export const getSentEmails = async (locationId: string) => {
-  const response = await api.get(`/emails/sent?locationId=${locationId}`);
-  return response.data;
-};
-
-export const resendFailedEmails = async (emailIds: string[]) => {
-  const response = await api.post('/emails/resend', { emailIds });
-  return response.data;
-};
-
-export const deactivateUser = async (userId: string) => {
-  const response = await api.delete(`/users/${userId}`);
-  return response.data;
-};
-
-// frontend/src/services/api.ts
-// Füge diese Funktionen hinzu oder aktualisiere die bestehenden
-
-// Buttons
-export const getButtonsForUser = async (locationId: string) => {
-  try {
     console.log('Button-Anfrage wird gesendet...');
     const response = await api.get(`/buttons/location/${locationId}`);
     console.log('Button-Antwort:', response.data);
@@ -152,7 +124,6 @@ export const getButtonsForUser = async (locationId: string) => {
     console.error('Fehler beim Abrufen der Buttons:', error);
     
     // Fallback für Entwicklungs- oder Testzwecke
-    // In Produktion würde man diese entfernen
     return [{
       id: 'fallback-button-1',
       name: 'Test-Button (Fallback)',
@@ -200,15 +171,6 @@ export const getEmailTemplates = async (locationId: string) => {
           locationId: locationId,
           created_by: 'system',
           created_at: new Date().toISOString()
-        },
-        {
-          id: 'mock-template-2',
-          name: 'Benachrichtigung',
-          subject: 'Neue Information',
-          body: 'Hallo {{name}}, es gibt neue Informationen!',
-          locationId: locationId,
-          created_by: 'system',
-          created_at: new Date().toISOString()
         }
       ];
     }
@@ -252,77 +214,9 @@ export const resendFailedEmails = async (emailIds: string[]) => {
   }
 };
 
-// frontend/src/services/api.ts
-import axios, { AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
-
-// Konstante für den Token-Schlüssel
-export const TOKEN_KEY = 'schul_dashboard_token';
-
-// API-URL aus .env oder fallback
-const API_URL = import.meta.env.VITE_API_URL || 'https://dashboard-backend-uweg.onrender.com/api';
-
-// Initialisiere Axios mit Basiskonfiguration
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  timeout: 15000, // 15 Sekunden Timeout für alle Anfragen
-});
-
-// Request Interceptor für das Hinzufügen des Tokens
-api.interceptors.request.use((config: AxiosRequestConfig) => {
-  const token = localStorage.getItem(TOKEN_KEY);
-  
-  console.log('Token für API-Anfrage:', token ? 'Vorhanden' : 'Nicht vorhanden');
-  
-  if (token) {
-    config.headers = config.headers || {};
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  
-  return config;
-});
-
-// Response Interceptor für bessere Fehlerbehandlung
-api.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  (error: AxiosError) => {
-    // Verbesserte Fehlerbehandlung
-    if (error.response) {
-      // Der Server hat geantwortet mit einem Statuscode außerhalb des 2xx-Bereichs
-      console.error('API Error Response:', {
-        status: error.response.status,
-        data: error.response.data,
-        headers: error.response.headers,
-        url: error.config?.url
-      });
-      
-      // 401-Fehler (Unauthorized) -> automatisches Logout
-      if (error.response.status === 401) {
-        console.log('401 Unauthorized - Auto-Logout');
-        // Optional: Automatischer Logout
-        // localStorage.removeItem(TOKEN_KEY);
-        // window.location.href = '/login';
-      }
-    } else if (error.request) {
-      // Die Anfrage wurde gestellt, aber keine Antwort erhalten
-      console.error('API Error Request:', {
-        request: error.request,
-        url: error.config?.url
-      });
-    } else {
-      // Beim Einrichten der Anfrage ist ein Fehler aufgetreten
-      console.error('API Error Setup:', error.message);
-    }
-    
-    return Promise.reject(error);
-  }
-);
-
-// Exportiere Basis-API
-export default api;
-
-// Exportiere API-Funktionen...
+export const deactivateUser = async (userId: string) => {
+  const response = await api.delete(`/users/${userId}`);
+  return response.data;
+};
 
 export default api;
