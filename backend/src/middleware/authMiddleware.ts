@@ -1,116 +1,29 @@
-// backend/src/middleware/authMiddleware.ts
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import pool from '../config/database';
-import { UserRole } from '../models/User';
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        userId: string;
-        role: UserRole;
-        locations: string[];
-      };
-    }
-  }
-}
-
-export const authenticate = (req: Request, res: Response, next: NextFunction) => {
-  const token = req.header('Authorization')?.replace('Bearer ', '');
-  
-  if (!token) {
-    console.log('Kein Token in der Anfrage gefunden');
-    return res.status(401).json({ message: 'Authentifizierung erforderlich' });
-  }
-
-  try {
-    console.log('Versuche Token zu verifizieren');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      userId: string;
-      role: UserRole;
-      locations: string[];
-    };
-    
-    console.log('Token erfolgreich verifiziert:', decoded);
-    
-    req.user = decoded;
-    next();
-  } catch (error) {
-    console.error('Token-Verifizierung fehlgeschlagen:', error);
-    res.status(401).json({ message: 'Ungültiger Token' });
-  }
-};
-
-export const authorize = (roles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      return res.status(401).json({ message: 'Authentifizierung erforderlich' });
-    }
-
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ message: 'Unzureichende Berechtigungen' });
-    }
-
-    next();
-  };
-};
-
-export const checkLocationAccess = async (req: Request, res: Response, next: NextFunction) => {
-  if (!req.user) {
-    return res.status(401).json({ message: 'Authentifizierung erforderlich' });
-  }
-
-  const locationId = req.params.locationId || req.body.locationId;
-  
-  if (!locationId) {
-    return res.status(400).json({ message: 'Standort-ID ist erforderlich' });
-  }
-
-  console.log(`checkLocationAccess: User=${req.user.userId}, Role=${req.user.role}, LocationId=${locationId}`);
-  console.log(`User locations: ${JSON.stringify(req.user.locations)}`);
-
-  // Developers have access to all locations
-  if (req.user.role === 'developer') {
-    console.log('User ist Developer - Zugriff erlaubt');
-    return next();
-  }
-// backend/src/middleware/authMiddleware.ts
-export const authenticate = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.header('Authorization');
-  const token = authHeader?.replace('Bearer ', '');
-  
-  console.log('Auth Header:', authHeader);
-  console.log('Extrahierter Token:', token ? token.substring(0, 20) + '...' : 'kein Token');
-  
-  if (!token) {
-    console.log('Kein Token in der Anfrage gefunden');
-    return res.status(401).json({ message: 'Authentifizierung erforderlich' });
-  }
-
-  try {
-    console.log('Versuche Token zu verifizieren');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      userId: string;
-      role: UserRole;
-      locations: string[];
-    };
-    
-    console.log('Token erfolgreich verifiziert:', decoded);
-    
-    req.user = decoded;
-    next();
-  } catch (error) {
-    console.error('Token-Verifizierung fehlgeschlagen:', error);
-    res.status(401).json({ message: 'Ungültiger Token' });
-  }
-};
-  // Check if user has access to this location
-  if (!req.user.locations.includes(locationId)) {
-    console.log('User hat keinen Zugriff auf diesen Standort');
-    return res.status(403).json({ message: 'Sie haben keinen Zugriff auf diesen Standort' });
-  }
-
-  console.log('User hat Zugriff auf diesen Standort');
-  next();
-};
+==> Cloning from https://github.com/NachhilfeProjekt/SchulDashboard
+==> Checking out commit 3162920ad653a39d8957bf683779017b4d522ec3 in branch main
+==> Downloading cache...
+==> Transferred 76MB in 7s. Extraction took 2s.
+==> Requesting Node.js version 18.x
+==> Using Node.js version 18.20.8 via ./backend/package.json
+==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+==> Using Bun version 1.1.0 (default)
+==> Docs on specifying a bun version: https://render.com/docs/bun-version
+==> Running build command 'cd backend && npm install --production=false && npm install --save-dev @types/express @types/cors @types/morgan @types/pg @types/uuid @types/bcryptjs @types/jsonwebtoken @types/winston @types/jest && mkdir -p src/validation && echo 'import Joi from "joi"; export const createUserSchema = Joi.object({ email: Joi.string().email().required(), role: Joi.string().valid("developer", "lead", "office", "teacher").required(), locations: Joi.array().items(Joi.string()).min(1).required() }); export const loginSchema = Joi.object({ email: Joi.string().email().required(), password: Joi.string().required() }); export const passwordResetSchema = Joi.object({ token: Joi.string().required(), newPassword: Joi.string().min(8).required() });' > src/validation/user.ts && npm run clean && npx tsc --skipLibCheck'...
+added 501 packages, and audited 502 packages in 13s
+55 packages are looking for funding
+  run `npm fund` for details
+6 high severity vulnerabilities
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+Run `npm audit` for details.
+up to date, audited 174 packages in 1s
+18 packages are looking for funding
+  run `npm fund` for details
+3 high severity vulnerabilities
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+Run `npm audit` for details.
+> dashboard-backend@1.0.0 clean
+> rm -rf dist/*
+src/middleware/authMiddleware.ts(79,1): error TS1184: Modifiers cannot appear here.
+==> Build failed 😞
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
