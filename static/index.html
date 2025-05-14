@@ -212,6 +212,9 @@
         <button type="button" id="mock-login" class="btn btn-outline">Offline-Modus</button>
         <button type="button" id="debug-toggle" class="btn btn-outline">Debug</button>
       </div>
+      <div class="input-group" style="text-align: center; margin-top: 10px;">
+        <button type="button" id="check-connection" class="btn btn-outline">Backend-Verbindung prüfen</button>
+      </div>
     </form>
     
     <div id="login-loader" class="loader hidden"></div>
@@ -268,7 +271,7 @@
   <script>
     // Konfiguration
     const config = {
-      apiUrl: 'https://schuldashboard-backend.onrender.com/api',
+      apiUrl: 'https://dashboard-backend-uweg.onrender.com/api',
       tokenKey: 'schul_dashboard_token',
       userKey: 'schul_dashboard_user',
       locationsKey: 'schul_dashboard_locations',
@@ -382,7 +385,7 @@
       document.getElementById('login-loader').classList.toggle('hidden', !show);
     }
     
-    // Login-Handler
+    // Login-Handler mit verbesserter Fehlerbehandlung
     async function handleLogin(e) {
       e.preventDefault();
       
@@ -394,45 +397,52 @@
       toggleLoader(true);
       
       try {
-        // API-Aufruf für Login
-        const response = await fetch(`${config.apiUrl}/auth/login`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ email, password })
+        // API-Aufruf für Login mit XMLHttpRequest für bessere CORS-Kompatibilität
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${config.apiUrl}/auth/login`, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        
+        // Promise-Wrapper für XMLHttpRequest
+        const loginData = await new Promise((resolve, reject) => {
+          xhr.onload = function() {
+            debug.log('Login response status', xhr.status);
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const data = JSON.parse(xhr.responseText);
+                resolve(data);
+              } catch (e) {
+                debug.log('Error parsing response', e);
+                reject(new Error('Ungültige Antwort vom Server'));
+              }
+            } else {
+              debug.log('Login failed', xhr.statusText);
+              try {
+                const errorResponse = JSON.parse(xhr.responseText);
+                reject(new Error(errorResponse.message || `Login fehlgeschlagen (${xhr.status})`));
+              } catch (e) {
+                reject(new Error(`Login fehlgeschlagen (${xhr.status})`));
+              }
+            }
+          };
+          
+          xhr.onerror = function(e) {
+            debug.log('XHR error', e);
+            reject(new Error('Netzwerkfehler beim Login-Versuch'));
+          };
+          
+          xhr.send(JSON.stringify({ email, password }));
         });
         
-        debug.log('Login-Response', { 
-          status: response.status, 
-          statusText: response.statusText,
-          ok: response.ok
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          debug.log('Login-Fehler', errorData);
-          throw new Error(errorData.message || 'Anmeldung fehlgeschlagen');
-        }
-        
-        const data = await response.json();
-        debug.log('Login erfolgreich', data);
+        debug.log('Login successful', loginData);
         
         // In localStorage speichern
-        auth.login(data.token, data.user, data.locations || []);
+        auth.login(loginData.token, loginData.user, loginData.locations || []);
         
         // Dashboard anzeigen
         showDashboard();
       } catch (error) {
-        debug.log('Login-Exception', { message: error.message, stack: error.stack });
+        debug.log('Login error', error);
         setMessage('login-message', `Fehler: ${error.message}`, 'error');
-        
-        // Prüfen, ob es ein Netzwerkfehler ist
-        if (error.message.includes('fetch') || error.message.includes('network')) {
-          setMessage('login-message', 
-            'Backend-Server ist nicht erreichbar. Versuchen Sie den Offline-Modus für Tests.', 
-            'error');
-        }
       } finally {
         toggleLoader(false);
       }
@@ -464,6 +474,52 @@
       }, 1000);
     }
     
+    // Verbindungsprüfung
+    async function checkBackendConnection() {
+      debug.log('Prüfe Backend-Verbindung');
+      setMessage('login-message', 'Prüfe Backend-Verbindung...', 'info');
+      toggleLoader(true);
+      
+      try {
+        // Health-Check-URL
+        const healthCheckUrl = `${config.apiUrl.replace('/api', '')}/health`;
+        debug.log('Health check URL', healthCheckUrl);
+        
+        // CORS-freundliche Anfrage mit XMLHttpRequest
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', healthCheckUrl, true);
+        
+        const response = await new Promise((resolve, reject) => {
+          xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve({
+                status: xhr.status,
+                statusText: xhr.statusText,
+                responseText: xhr.responseText
+              });
+            } else {
+              reject(new Error(`Server antwortet mit Status ${xhr.status}: ${xhr.statusText}`));
+            }
+          };
+          
+          xhr.onerror = function() {
+            reject(new Error('Netzwerkfehler bei der Verbindungsprüfung'));
+          };
+          
+          xhr.send();
+        });
+        
+        debug.log('Health check response', response);
+        
+        setMessage('login-message', `Backend ist erreichbar! Status: ${response.status} ${response.statusText}`, 'success');
+      } catch (error) {
+        debug.log('Health check error', error);
+        setMessage('login-message', `Backend ist nicht erreichbar: ${error.message}`, 'error');
+      } finally {
+        toggleLoader(false);
+      }
+    }
+    
     // Event-Listener
     document.addEventListener('DOMContentLoaded', () => {
       // Prüfen, ob Benutzer angemeldet ist
@@ -481,11 +537,19 @@
       // Offline-Modus
       document.getElementById('mock-login').addEventListener('click', handleMockLogin);
       
+      // Backend-Verbindung prüfen
+      document.getElementById('check-connection').addEventListener('click', checkBackendConnection);
+      
       // Debug-Toggle
       document.getElementById('debug-toggle').addEventListener('click', () => debug.toggleDebug());
       
       // Logout
       document.getElementById('logout-btn').addEventListener('click', () => auth.logout());
+      
+      // Debug-Modus aktivieren, wenn URL-Parameter vorhanden
+      if (window.location.search.includes('debug=true')) {
+        debug.toggleDebug();
+      }
     });
   </script>
 </body>
