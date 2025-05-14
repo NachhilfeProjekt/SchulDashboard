@@ -1,9 +1,5 @@
-// backend/src/scripts/initDatabase.ts
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
-import fs from 'fs';
-import path from 'path';
-import logger from '../config/logger';
 
 // Lade Umgebungsvariablen
 dotenv.config();
@@ -18,11 +14,11 @@ const dbConfig = {
   ssl: { rejectUnauthorized: false }
 };
 
-async function initializeDatabase() {
+export async function initializeDatabase() {
   const pool = new Pool(dbConfig);
   
   try {
-    logger.info('Starte Datenbank-Initialisierung...');
+    console.log('Starte Datenbank-Initialisierung...');
     
     // SQL für die Tabellenerstellung
     const createTablesSql = `
@@ -42,18 +38,13 @@ async function initializeDatabase() {
         updated_at TIMESTAMP DEFAULT NOW()
       );
 
-      -- Tabellenstruktur für Standorte
+      -- Tabelle für Standorte
       CREATE TABLE IF NOT EXISTS locations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name VARCHAR(255) NOT NULL,
         created_by UUID,
         created_at TIMESTAMP DEFAULT NOW()
       );
-
-      -- Beziehungstabelle für Benutzer und Standorte
-      ALTER TABLE users ADD CONSTRAINT fk_users_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
-      ALTER TABLE users ADD CONSTRAINT fk_users_deactivated_by FOREIGN KEY (deactivated_by) REFERENCES users(id) ON DELETE SET NULL;
-      ALTER TABLE locations ADD CONSTRAINT fk_locations_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
 
       -- Benutzer-Standort-Zuordnung
       CREATE TABLE IF NOT EXISTS user_locations (
@@ -106,28 +97,9 @@ async function initializeDatabase() {
       );
     `;
 
-    // SQL für Foreign Keys und Constraints
-    const foreignKeysSql = `
-      -- Foreign Keys für Beziehungstabellen
-      ALTER TABLE user_locations ADD CONSTRAINT fk_user_locations_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-      ALTER TABLE user_locations ADD CONSTRAINT fk_user_locations_location_id FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE;
-
-      ALTER TABLE custom_buttons ADD CONSTRAINT fk_custom_buttons_location_id FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE;
-      ALTER TABLE custom_buttons ADD CONSTRAINT fk_custom_buttons_created_by FOREIGN KEY (created_by) REFERENCES users(id);
-
-      ALTER TABLE button_permissions ADD CONSTRAINT fk_button_permissions_button_id FOREIGN KEY (button_id) REFERENCES custom_buttons(id) ON DELETE CASCADE;
-      ALTER TABLE button_permissions ADD CONSTRAINT fk_button_permissions_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-
-      ALTER TABLE email_templates ADD CONSTRAINT fk_email_templates_location_id FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE;
-      ALTER TABLE email_templates ADD CONSTRAINT fk_email_templates_created_by FOREIGN KEY (created_by) REFERENCES users(id);
-
-      ALTER TABLE sent_emails ADD CONSTRAINT fk_sent_emails_template_id FOREIGN KEY (template_id) REFERENCES email_templates(id) ON DELETE SET NULL;
-      ALTER TABLE sent_emails ADD CONSTRAINT fk_sent_emails_location_id FOREIGN KEY (location_id) REFERENCES locations(id);
-    `;
-
     // SQL für initiale Admin-Daten
     const initialDataSql = `
-      -- Initialer Admin-Benutzer (Passwort: admin123)
+      -- Admin-Benutzer einfügen
       INSERT INTO users (id, email, password, role, is_active)
       VALUES (
         '11111111-1111-1111-1111-111111111111',
@@ -154,51 +126,39 @@ async function initializeDatabase() {
     `;
 
     // Führe Tabellenerstellung aus
-    logger.info('Erstelle Tabellen...');
+    console.log('Erstelle Tabellen...');
     await pool.query(createTablesSql);
-    logger.info('Tabellen erfolgreich erstellt.');
-
-    // Versuche Foreign Keys zu erstellen (kann fehlschlagen, wenn bereits vorhanden)
-    try {
-      logger.info('Erstelle Foreign Keys...');
-      await pool.query(foreignKeysSql);
-      logger.info('Foreign Keys erfolgreich erstellt.');
-    } catch (error) {
-      logger.warn('Einige Foreign Keys konnten nicht erstellt werden (möglicherweise bereits vorhanden).');
-    }
+    console.log('Tabellen erfolgreich erstellt.');
 
     // Füge initiale Daten ein
-    logger.info('Füge initiale Daten ein...');
+    console.log('Füge initiale Daten ein...');
     await pool.query(initialDataSql);
-    logger.info('Initiale Daten erfolgreich eingefügt.');
+    console.log('Initiale Daten erfolgreich eingefügt.');
 
-    logger.info('Datenbank-Initialisierung abgeschlossen!');
+    console.log('Datenbank-Initialisierung abgeschlossen!');
     return true;
   } catch (error) {
-    logger.error(`Fehler bei der Datenbank-Initialisierung: ${error.message}`);
-    if (error.stack) {
-      logger.error(error.stack);
-    }
+    console.error(`Fehler bei der Datenbank-Initialisierung: ${error.message}`);
     return false;
   } finally {
     await pool.end();
   }
 }
 
-// Starte die Initialisierung, wenn das Skript direkt ausgeführt wird
+// Wenn direkt aufgerufen
 if (require.main === module) {
   initializeDatabase()
     .then(success => {
       if (success) {
+        console.log('Initialisierung erfolgreich');
         process.exit(0);
       } else {
+        console.error('Initialisierung fehlgeschlagen');
         process.exit(1);
       }
     })
     .catch(err => {
-      logger.error(`Unerwarteter Fehler: ${err}`);
+      console.error('Unerwarteter Fehler:', err);
       process.exit(1);
     });
 }
-
-export default initializeDatabase;
