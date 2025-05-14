@@ -14,10 +14,11 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: '*', // Während der Entwicklung, für Produktion einschränken
+  origin: ['https://dashboard-frontend-p693.onrender.com', 'http://localhost:3000'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
+}));
 }));
 app.use(helmet());
 app.use(morgan('dev'));
