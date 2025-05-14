@@ -1,6 +1,6 @@
-// static/js/config.js
+// In static/js/config.js
 const config = {
-  apiUrl: 'https://dashboard-backend-uweg.onrender.com/api',
+  apiUrl: 'https://dashboard-backend-uweg.onrender.com/api', // Einheitliche API-URL
   tokenKey: 'schul_dashboard_token',
   userKey: 'schul_dashboard_user',
   locationsKey: 'schul_dashboard_locations',
