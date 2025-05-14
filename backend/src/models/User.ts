@@ -207,10 +207,18 @@ export const resetPassword = async (token: string, newPassword: string): Promise
   }
 };
 
+// Aktualisiere in backend/src/models/User.ts die getButtonsForUser-Funktion
 export const getButtonsForUser = async (userId: string, locationId: string): Promise<CustomButton[]> => {
   try {
+    console.log(`getButtonsForUser aufgerufen mit userId=${userId}, locationId=${locationId}`);
+    
     const user = await getUserById(userId);
-    if (!user) throw new Error('Benutzer nicht gefunden');
+    if (!user) {
+      console.log('Benutzer nicht gefunden');
+      throw new Error('Benutzer nicht gefunden');
+    }
+    
+    console.log(`Benutzer gefunden: role=${user.role}`);
     
     let query = '';
     
@@ -221,7 +229,33 @@ export const getButtonsForUser = async (userId: string, locationId: string): Pro
         WHERE location_id = $1
         ORDER BY name`;
       
+      console.log('Verwende Developer-Query');
       const result = await pool.query(query, [locationId]);
+      console.log(`Developer-Query lieferte ${result.rows.length} Buttons`);
+      
+      // Wenn keine Buttons gefunden wurden, füge einen Test-Button hinzu
+      if (result.rows.length === 0) {
+        console.log('Keine Buttons gefunden, erstelle Test-Button');
+        try {
+          const insertResult = await pool.query(`
+            INSERT INTO custom_buttons (name, url, location_id, created_by)
+            VALUES ('Test-Button', 'https://example.com', $1, $2)
+            RETURNING *
+          `, [locationId, userId]);
+          
+          // Berechtigungen hinzufügen
+          await pool.query(`
+            INSERT INTO button_permissions (button_id, role)
+            VALUES ($1, 'developer'), ($1, 'lead'), ($1, 'office'), ($1, 'teacher')
+          `, [insertResult.rows[0].id]);
+          
+          console.log('Test-Button erstellt:', insertResult.rows[0]);
+          return [insertResult.rows[0]];
+        } catch (err) {
+          console.error('Fehler beim Erstellen des Test-Buttons:', err);
+        }
+      }
+      
       return result.rows;
     } else {
       // Other users see buttons based on their role or specific permissions
@@ -235,11 +269,14 @@ export const getButtonsForUser = async (userId: string, locationId: string): Pro
         )
         ORDER BY cb.name`;
       
+      console.log('Verwende Role-based Query');
+      console.log(`Parameter: locationId=${locationId}, role=${user.role}, userId=${userId}`);
       const result = await pool.query(query, [locationId, user.role, userId]);
+      console.log(`Role-based Query lieferte ${result.rows.length} Buttons`);
       return result.rows;
     }
   } catch (error) {
-    logger.error(`Fehler beim Abrufen der Buttons für den Benutzer: ${error}`);
+    console.error(`Fehler beim Abrufen der Buttons für den Benutzer: ${error}`);
     throw error;
   }
 };
