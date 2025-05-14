@@ -11,7 +11,7 @@ import buttonRoutes from './routes/buttonRoutes';
 import emailRoutes from './routes/emailRoutes';
 import { notFound, errorHandler } from './middleware/errorMiddleware';
 import logger from './config/logger';
-import initializeDatabase from './scripts/initDatabase';
+import { initializeDatabase } from './scripts/initDatabase';
 
 // Lade Umgebungsvariablen
 dotenv.config();
