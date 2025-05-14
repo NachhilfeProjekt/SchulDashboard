@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
   <style>
-    /* Basis-Styling */
     * {
       box-sizing: border-box;
       margin: 0;
@@ -103,7 +102,6 @@
       color: #0277bd;
     }
     
-    /* Dashboard Styling */
     .dashboard {
       max-width: 1200px;
       margin: 0 auto;
@@ -144,13 +142,12 @@
       display: none;
     }
     
-    /* Debug Panel */
     #debug-panel {
       position: fixed;
       bottom: 10px;
       right: 10px;
-      max-width: 500px;
-      max-height: 400px;
+      max-width: 80%;
+      max-height: 60%;
       overflow-y: auto;
       background-color: rgba(0, 0, 0, 0.8);
       color: #00ff00;
@@ -165,7 +162,6 @@
       font-size: 12px;
     }
     
-    /* Loader */
     .loader {
       border: 4px solid #f3f3f3;
       border-top: 4px solid #1976d2;
@@ -179,6 +175,36 @@
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
+    }
+    
+    .connection-info {
+      margin-top: 10px;
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+    
+    .connection-method {
+      margin-bottom: 5px;
+      padding: 5px;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    .connection-method.success {
+      background-color: #d4edda;
+    }
+    
+    .connection-method.error {
+      background-color: #f8d7da;
+    }
+    
+    .connection-method.pending {
+      background-color: #fff3cd;
     }
   </style>
 </head>
@@ -212,13 +238,15 @@
         <button type="button" id="mock-login" class="btn btn-outline">Offline-Modus</button>
         <button type="button" id="debug-toggle" class="btn btn-outline">Debug</button>
       </div>
-      <div class="input-group" style="text-align: center; margin-top: 10px;">
-        <button type="button" id="check-connection" class="btn btn-outline">Backend-Verbindung prüfen</button>
-      </div>
     </form>
     
     <div id="login-loader" class="loader hidden"></div>
     <div id="login-message" class="message"></div>
+    
+    <div id="connection-test-container" style="margin-top: 20px;">
+      <button id="test-connection-btn" class="btn btn-block btn-outline">Verbindungstest durchführen</button>
+      <div id="connection-info" class="connection-info hidden"></div>
+    </div>
   </div>
 
   <!-- Dashboard Container -->
@@ -269,19 +297,43 @@
   </div>
 
   <script>
-    // Konfiguration
+    // Konfiguration mit mehreren Backend-URLs für CORS-Probleme
     const config = {
-      apiUrl: 'https://dashboard-backend-uweg.onrender.com/api',
+      backendOptions: [
+        {
+          name: 'Direkte URL',
+          apiUrl: 'https://dashboard-backend-uweg.onrender.com/api',
+          status: 'pending'
+        },
+        {
+          name: 'Alt-URL (ohne /api)',
+          apiUrl: 'https://dashboard-backend-uweg.onrender.com',
+          status: 'pending'
+        },
+        {
+          name: 'CORS-Proxy',
+          apiUrl: 'https://cors-anywhere.herokuapp.com/https://dashboard-backend-uweg.onrender.com/api',
+          status: 'pending'
+        }
+      ],
+      selectedBackend: 0, // Index der aktuell verwendeten Backend-Option
       tokenKey: 'schul_dashboard_token',
       userKey: 'schul_dashboard_user',
       locationsKey: 'schul_dashboard_locations',
       currentLocationKey: 'schul_dashboard_current_location'
     };
     
+    // Aktuelles Backend
+    function getApiUrl() {
+      return config.backendOptions[config.selectedBackend].apiUrl;
+    }
+    
     // Debug-Funktionalität
     const debug = {
       enabled: false,
       log: function(message, data) {
+        console.log(message, data);
+        
         if (!this.enabled) return;
         
         const logElement = document.getElementById('debug-log');
@@ -385,7 +437,7 @@
       document.getElementById('login-loader').classList.toggle('hidden', !show);
     }
     
-    // Login-Handler mit verbesserter Fehlerbehandlung
+    // Login-Handler mit verbesserter Fehlerbehandlung und mehreren Verbindungsmethoden
     async function handleLogin(e) {
       e.preventDefault();
       
@@ -396,56 +448,82 @@
       setMessage('login-message', 'Anmeldung läuft...', 'info');
       toggleLoader(true);
       
-      try {
-        // API-Aufruf für Login mit XMLHttpRequest für bessere CORS-Kompatibilität
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${config.apiUrl}/auth/login`, true);
-        xhr.setRequestHeader('Content-Type', 'application/json');
+      // Versuche alle konfigurierten Backend-Methoden
+      let success = false;
+      let lastError = null;
+      
+      for (let i = 0; i < config.backendOptions.length; i++) {
+        if (config.backendOptions[i].status === 'error') continue; // Überspringe bereits fehlgeschlagene Optionen
         
-        // Promise-Wrapper für XMLHttpRequest
-        const loginData = await new Promise((resolve, reject) => {
-          xhr.onload = function() {
-            debug.log('Login response status', xhr.status);
-            if (xhr.status >= 200 && xhr.status < 300) {
-              try {
-                const data = JSON.parse(xhr.responseText);
-                resolve(data);
-              } catch (e) {
-                debug.log('Error parsing response', e);
-                reject(new Error('Ungültige Antwort vom Server'));
-              }
-            } else {
-              debug.log('Login failed', xhr.statusText);
-              try {
-                const errorResponse = JSON.parse(xhr.responseText);
-                reject(new Error(errorResponse.message || `Login fehlgeschlagen (${xhr.status})`));
-              } catch (e) {
-                reject(new Error(`Login fehlgeschlagen (${xhr.status})`));
-              }
-            }
-          };
+        config.selectedBackend = i;
+        debug.log(`Versuche Backend-Option ${i+1}: ${config.backendOptions[i].name}`);
+        
+        try {
+          // Versuche Login mit XMLHttpRequest
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', `${getApiUrl()}/auth/login`, true);
+          xhr.setRequestHeader('Content-Type', 'application/json');
           
-          xhr.onerror = function(e) {
-            debug.log('XHR error', e);
-            reject(new Error('Netzwerkfehler beim Login-Versuch'));
-          };
+          // Promise-Wrapper für XMLHttpRequest
+          const loginData = await new Promise((resolve, reject) => {
+            xhr.onload = function() {
+              debug.log(`Backend ${i+1} Status`, xhr.status);
+              if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                  const data = JSON.parse(xhr.responseText);
+                  resolve(data);
+                } catch (e) {
+                  debug.log(`Error parsing response from Backend ${i+1}`, e);
+                  reject(new Error('Ungültige Antwort vom Server'));
+                }
+              } else {
+                debug.log(`Login failed with Backend ${i+1}`, xhr.statusText);
+                try {
+                  const errorResponse = JSON.parse(xhr.responseText);
+                  reject(new Error(errorResponse.message || `Login fehlgeschlagen (${xhr.status})`));
+                } catch (e) {
+                  reject(new Error(`Login fehlgeschlagen (${xhr.status})`));
+                }
+              }
+            };
+            
+            xhr.onerror = function(e) {
+              debug.log(`XHR error with Backend ${i+1}`, e);
+              reject(new Error('Netzwerkfehler beim Login-Versuch'));
+            };
+            
+            xhr.timeout = 10000; // 10 Sekunden Timeout
+            xhr.ontimeout = function() {
+              debug.log(`Timeout with Backend ${i+1}`);
+              reject(new Error('Zeitüberschreitung bei der Verbindung'));
+            };
+            
+            xhr.send(JSON.stringify({ email, password }));
+          });
           
-          xhr.send(JSON.stringify({ email, password }));
-        });
-        
-        debug.log('Login successful', loginData);
-        
-        // In localStorage speichern
-        auth.login(loginData.token, loginData.user, loginData.locations || []);
-        
-        // Dashboard anzeigen
-        showDashboard();
-      } catch (error) {
-        debug.log('Login error', error);
-        setMessage('login-message', `Fehler: ${error.message}`, 'error');
-      } finally {
-        toggleLoader(false);
+          debug.log(`Login successful with Backend ${i+1}`, loginData);
+          config.backendOptions[i].status = 'success';
+          
+          // In localStorage speichern
+          auth.login(loginData.token, loginData.user, loginData.locations || []);
+          
+          // Dashboard anzeigen
+          success = true;
+          showDashboard();
+          break; // Erfolgreich - Schleife abbrechen
+        } catch (error) {
+          debug.log(`Login error with Backend ${i+1}`, error);
+          config.backendOptions[i].status = 'error';
+          lastError = error;
+        }
       }
+      
+      if (!success) {
+        debug.log('All backend options failed', config.backendOptions);
+        setMessage('login-message', `Fehler: ${lastError.message}. Bitte verwenden Sie den Offline-Modus oder führen Sie einen Verbindungstest durch.`, 'error');
+      }
+      
+      toggleLoader(false);
     }
     
     // Offline-Login
@@ -474,50 +552,116 @@
       }, 1000);
     }
     
-    // Verbindungsprüfung
-    async function checkBackendConnection() {
-      debug.log('Prüfe Backend-Verbindung');
-      setMessage('login-message', 'Prüfe Backend-Verbindung...', 'info');
-      toggleLoader(true);
+    // Verbindungstest für alle konfigurierten Backend-Optionen
+    async function testConnections() {
+      debug.log('Starte Verbindungstest');
+      const infoContainer = document.getElementById('connection-info');
+      infoContainer.classList.remove('hidden');
+      infoContainer.innerHTML = '<h4>Verbindungstest läuft...</h4>';
       
-      try {
-        // Health-Check-URL
-        const healthCheckUrl = `${config.apiUrl.replace('/api', '')}/health`;
-        debug.log('Health check URL', healthCheckUrl);
+      const results = [];
+      
+      for (let i = 0; i < config.backendOptions.length; i++) {
+        const option = config.backendOptions[i];
         
-        // CORS-freundliche Anfrage mit XMLHttpRequest
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', healthCheckUrl, true);
+        results.push(`<div class="connection-method pending">
+          <span>${option.name}</span>
+          <span>Wird getestet...</span>
+        </div>`);
         
-        const response = await new Promise((resolve, reject) => {
-          xhr.onload = function() {
-            if (xhr.status >= 200 && xhr.status < 300) {
+        infoContainer.innerHTML = results.join('');
+        
+        try {
+          // Healthcheck URL aus API-URL ableiten
+          let healthUrl = option.apiUrl.replace('/api', '');
+          if (option.apiUrl.includes('cors-anywhere')) {
+            healthUrl = option.apiUrl.replace('/api', '/health');
+          } else {
+            healthUrl = `${healthUrl}/health`;
+          }
+          
+          debug.log(`Teste Backend ${i+1}`, { 
+            name: option.name, 
+            url: option.apiUrl,
+            healthUrl: healthUrl
+          });
+          
+          // CORS-freundliche Anfrage mit XMLHttpRequest
+          const xhr = new XMLHttpRequest();
+          xhr.open('GET', healthUrl, true);
+          
+          const response = await new Promise((resolve, reject) => {
+            xhr.onload = function() {
               resolve({
                 status: xhr.status,
                 statusText: xhr.statusText,
                 responseText: xhr.responseText
               });
-            } else {
-              reject(new Error(`Server antwortet mit Status ${xhr.status}: ${xhr.statusText}`));
-            }
-          };
+            };
+            
+            xhr.onerror = function() {
+              reject(new Error('Netzwerkfehler'));
+            };
+            
+            xhr.timeout = 5000; // 5 Sekunden Timeout
+            xhr.ontimeout = function() {
+              reject(new Error('Zeitüberschreitung'));
+            };
+            
+            xhr.send();
+          });
           
-          xhr.onerror = function() {
-            reject(new Error('Netzwerkfehler bei der Verbindungsprüfung'));
-          };
+          debug.log(`Backend ${i+1} health response`, response);
           
-          xhr.send();
-        });
+          if (response.status >= 200 && response.status < 300) {
+            option.status = 'success';
+            results[i] = `<div class="connection-method success">
+              <span>${option.name}</span>
+              <span>OK (${response.status})</span>
+            </div>`;
+          } else {
+            option.status = 'error';
+            results[i] = `<div class="connection-method error">
+              <span>${option.name}</span>
+              <span>Fehler (${response.status})</span>
+            </div>`;
+          }
+        } catch (error) {
+          debug.log(`Backend ${i+1} error`, error);
+          option.status = 'error';
+          results[i] = `<div class="connection-method error">
+            <span>${option.name}</span>
+            <span>Fehler: ${error.message}</span>
+          </div>`;
+        }
         
-        debug.log('Health check response', response);
-        
-        setMessage('login-message', `Backend ist erreichbar! Status: ${response.status} ${response.statusText}`, 'success');
-      } catch (error) {
-        debug.log('Health check error', error);
-        setMessage('login-message', `Backend ist nicht erreichbar: ${error.message}`, 'error');
-      } finally {
-        toggleLoader(false);
+        infoContainer.innerHTML = results.join('');
       }
+      
+      // Füge Zusammenfassung hinzu
+      const successCount = config.backendOptions.filter(o => o.status === 'success').length;
+      let summary;
+      
+      if (successCount > 0) {
+        // Setze die erste erfolgreiche Backend-Option als ausgewählt
+        for (let i = 0; i < config.backendOptions.length; i++) {
+          if (config.backendOptions[i].status === 'success') {
+            config.selectedBackend = i;
+            break;
+          }
+        }
+        
+        summary = `<div class="connection-method success">
+          <strong>Zusammenfassung:</strong> ${successCount} von ${config.backendOptions.length} Backend-Optionen erfolgreich.
+          Die Option "${config.backendOptions[config.selectedBackend].name}" wird für Login verwendet.
+        </div>`;
+      } else {
+        summary = `<div class="connection-method error">
+          <strong>Zusammenfassung:</strong> Keine Backend-Verbindung möglich. Bitte verwenden Sie den Offline-Modus.
+        </div>`;
+      }
+      
+      infoContainer.innerHTML += summary;
     }
     
     // Event-Listener
@@ -537,8 +681,8 @@
       // Offline-Modus
       document.getElementById('mock-login').addEventListener('click', handleMockLogin);
       
-      // Backend-Verbindung prüfen
-      document.getElementById('check-connection').addEventListener('click', checkBackendConnection);
+      // Verbindungstest
+      document.getElementById('test-connection-btn').addEventListener('click', testConnections);
       
       // Debug-Toggle
       document.getElementById('debug-toggle').addEventListener('click', () => debug.toggleDebug());
