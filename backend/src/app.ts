@@ -1,3 +1,4 @@
+// backend/src/app.ts
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -35,7 +36,13 @@ app.get('/health', (req: express.Request, res: express.Response) => {
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
-});
+// Server starten, wenn dies das Hauptmodul ist
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    logger.info(`Server running on port ${PORT}`);
+  });
+}
+
+// Export für Tests
+export default app;
