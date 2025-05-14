@@ -1,4 +1,3 @@
-// frontend/src/services/api.ts
 import axios from 'axios';
 
 // Konstante API-URL für alle Anfragen
@@ -14,8 +13,13 @@ const api = axios.create({
 
 // Request Interceptor für das Hinzufügen des Tokens
 api.interceptors.request.use((config) => {
+  // Verwende "schul_dashboard_token" als Schlüssel
   const token = localStorage.getItem('schul_dashboard_token');
+  
+  console.log('Token für API-Anfrage:', token ? 'Vorhanden' : 'Nicht vorhanden');
+  
   if (token) {
+    // Setze den Authorization-Header mit dem Bearer-Token
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
