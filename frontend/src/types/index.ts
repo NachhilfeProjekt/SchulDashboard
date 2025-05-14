@@ -3,6 +3,7 @@ export interface User {
   email: string;
   role: 'developer' | 'lead' | 'office' | 'teacher';
   createdAt: string;
+  locations?: any[]; // Hinzufügen der fehlenden locations-Eigenschaft
 }
 
 export interface Location {
