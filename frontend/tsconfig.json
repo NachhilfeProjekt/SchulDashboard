@@ -28,6 +28,6 @@
     "jsx": "react-jsx",
     "types": ["vite/client"]
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src"]
+  // Entferne die "references" Zeile, die auf tsconfig.node.json verweist
 }
