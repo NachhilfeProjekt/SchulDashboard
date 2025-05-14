@@ -1,3 +1,4 @@
+// backend/src/scripts/initDatabase.ts
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
 
@@ -6,13 +7,12 @@ dotenv.config();
 
 // Konfiguration aus Umgebungsvariablen
 const dbConfig = {
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
+  user: process.env.DB_USER || 'dashboard_db_cthh_user',
+  host: process.env.DB_HOST || 'dpg-d0gbpv49c44c73fefpog-a.frankfurt-postgres.render.com',
+  database: process.env.DB_NAME || 'dashboard_db_cthh',
+  password: process.env.DB_PASSWORD || 'hWArsuzVNizlCilLT3sk35bzwqWbtaUT',
   port: parseInt(process.env.DB_PORT || '5432'),
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
-};
 };
 
 export async function initializeDatabase() {
