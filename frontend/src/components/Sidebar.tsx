@@ -1,5 +1,5 @@
 // frontend/src/components/Sidebar.tsx
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
 import { Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar } from '@mui/material';
@@ -18,19 +18,9 @@ const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => {
-    console.log("Sidebar: Aktueller Pfad:", location.pathname);
-  }, [location]);
-
   const handleNavigation = (path: string) => {
     console.log(`Sidebar: Navigation zu ${path} angefordert`);
-    try {
-      navigate(path);
-    } catch (error) {
-      console.error(`Sidebar: Fehler bei Navigation zu ${path}:`, error);
-      // Fallback
-      window.location.href = path;
-    }
+    navigate(path);
   };
 
   if (!user || !currentLocation) return null;
