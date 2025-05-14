@@ -1,8 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import reportWebVitals from './reportWebVitals';
+import { Provider } from 'react-redux';
+import store from './store/store';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import reportWebVitals from './reportWebVitals';
 
 const theme = createTheme({
   palette: {
@@ -30,11 +32,14 @@ const root = ReactDOM.createRoot(
 
 root.render(
   <React.StrictMode>
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <App />
-    </ThemeProvider>
+    <Provider store={store}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <App />
+      </ThemeProvider>
+    </Provider>
   </React.StrictMode>
 );
 
+// Optional: Measure performance
 reportWebVitals();
