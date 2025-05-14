@@ -1,14 +1,131 @@
-<!-- frontend/index.html -->
-<!DOCTYPE html>
-<html lang="de">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/src/assets/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dashboard System</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+// Diese Funktion im <script>-Bereich der index.html ersetzen
+// Login-Handler mit verbesserter Fehlerbehandlung und Offline-Modus-Integration
+async function handleLogin(e) {
+  e.preventDefault();
+  
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  
+  debug.log('Login-Versuch', { email, password: '***' });
+  
+  // Direkter Offline-Modus für Standardanmeldedaten
+  if (email === 'admin@example.com' && password === 'admin123') {
+    debug.log('Standard-Anmeldedaten erkannt. Verwende Offline-Modus.');
+    handleMockLogin();
+    return;
+  }
+  
+  setMessage('login-message', 'Anmeldung läuft...', 'info');
+  toggleLoader(true);
+  
+  // Versuche alle konfigurierten Backend-Methoden
+  let success = false;
+  let lastError = null;
+  
+  for (let i = 0; i < config.backendOptions.length; i++) {
+    if (config.backendOptions[i].status === 'error') continue; // Überspringe bereits fehlgeschlagene Optionen
+    
+    config.selectedBackend = i;
+    debug.log(`Versuche Backend-Option ${i+1}: ${config.backendOptions[i].name}`);
+    
+    try {
+      // Versuche Login mit XMLHttpRequest
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${getApiUrl()}/auth/login`, true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      
+      // Promise-Wrapper für XMLHttpRequest
+      const loginData = await new Promise((resolve, reject) => {
+        xhr.onload = function() {
+          debug.log(`Backend ${i+1} Status`, xhr.status);
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              resolve(data);
+            } catch (e) {
+              debug.log(`Error parsing response from Backend ${i+1}`, e);
+              reject(new Error('Ungültige Antwort vom Server'));
+            }
+          } else {
+            debug.log(`Login failed with Backend ${i+1}`, xhr.statusText);
+            try {
+              const errorResponse = JSON.parse(xhr.responseText);
+              reject(new Error(errorResponse.message || `Login fehlgeschlagen (${xhr.status})`));
+            } catch (e) {
+              reject(new Error(`Login fehlgeschlagen (${xhr.status})`));
+            }
+          }
+        };
+        
+        xhr.onerror = function(e) {
+          debug.log(`XHR error with Backend ${i+1}`, e);
+          reject(new Error('Netzwerkfehler beim Login-Versuch'));
+        };
+        
+        xhr.timeout = 10000; // 10 Sekunden Timeout
+        xhr.ontimeout = function() {
+          debug.log(`Timeout with Backend ${i+1}`);
+          reject(new Error('Zeitüberschreitung bei der Verbindung'));
+        };
+        
+        xhr.send(JSON.stringify({ email, password }));
+      });
+      
+      debug.log(`Login successful with Backend ${i+1}`, loginData);
+      config.backendOptions[i].status = 'success';
+      
+      // In localStorage speichern
+      auth.login(loginData.token, loginData.user, loginData.locations || []);
+      
+      // Dashboard anzeigen
+      success = true;
+      showDashboard();
+      break; // Erfolgreich - Schleife abbrechen
+    } catch (error) {
+      debug.log(`Login error with Backend ${i+1}`, error);
+      config.backendOptions[i].status = 'error';
+      lastError = error;
+    }
+  }
+  
+  if (!success) {
+    debug.log('All backend options failed', config.backendOptions);
+    
+    // Wenn die Standardanmeldedaten verwendet wurden, automatisch in den Offline-Modus wechseln
+    if (email === 'admin@example.com' && password === 'admin123') {
+      debug.log('Standardanmeldedaten verwendet - Fallback auf Offline-Modus');
+      handleMockLogin();
+    } else {
+      setMessage('login-message', `Fehler: ${lastError.message}. Bitte verwenden Sie admin@example.com / admin123 oder den Offline-Modus.`, 'error');
+    }
+  }
+  
+  toggleLoader(false);
+}
+
+// Diese Funktion im <script>-Bereich der index.html ersetzen oder anpassen
+// Offline-Login
+function handleMockLogin() {
+  debug.log('Offline-Login aktiviert');
+  
+  // Mock-Daten
+  const mockUser = {
+    id: '11111111-1111-1111-1111-111111111111',
+    email: 'admin@example.com',
+    role: 'developer'
+  };
+  
+  const mockLocations = [
+    { id: 'loc-1', name: 'Hauptstandort', createdAt: new Date().toISOString() }
+  ];
+  
+  // In localStorage speichern
+  auth.login('mock-token-123', mockUser, mockLocations);
+  
+  setMessage('login-message', 'Offline-Modus aktiviert! Eingeschränkte Funktionalität verfügbar.', 'success');
+  
+  // Nach kurzer Verzögerung Dashboard anzeigen
+  setTimeout(() => {
+    showDashboard();
+  }, 1000);
+}
