@@ -6,207 +6,487 @@
   <title>Schul Dashboard</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
-  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* Basis-Styling */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Roboto', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f5f5f5;
+    }
+    
+    .container {
+      max-width: 400px;
+      margin: 50px auto;
+      padding: 20px;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .header h1 {
+      color: #1976d2;
+      margin-bottom: 5px;
+    }
+    
+    .input-group {
+      margin-bottom: 15px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    
+    .btn {
+      display: inline-block;
+      background-color: #1976d2;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-right: 10px;
+    }
+    
+    .btn-outline {
+      background-color: white;
+      color: #1976d2;
+      border: 1px solid #1976d2;
+    }
+    
+    .btn-block {
+      display: block;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    
+    .message {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    
+    .info {
+      background-color: #e1f5fe;
+      color: #0277bd;
+    }
+    
+    /* Dashboard Styling */
+    .dashboard {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+    
+    .dashboard-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .card {
+      background-color: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .card-title {
+      color: #1976d2;
+      margin-bottom: 10px;
+      font-size: 18px;
+      font-weight: 500;
+    }
+    
+    .hidden {
+      display: none;
+    }
+    
+    /* Debug Panel */
+    #debug-panel {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      max-width: 500px;
+      max-height: 400px;
+      overflow-y: auto;
+      background-color: rgba(0, 0, 0, 0.8);
+      color: #00ff00;
+      font-family: monospace;
+      padding: 10px;
+      border-radius: 4px;
+      z-index: 9999;
+    }
+    
+    #debug-panel pre {
+      white-space: pre-wrap;
+      font-size: 12px;
+    }
+    
+    /* Loader */
+    .loader {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #1976d2;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 2s linear infinite;
+      margin: 10px auto;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
-  <div id="app" class="app-container">
-    <div class="hidden" id="loading-container">
-      <div class="loader"></div>
-      <p>Lädt...</p>
-    </div>
+  <!-- Debug Panel -->
+  <div id="debug-panel" class="hidden">
+    <h4>Debug Log</h4>
+    <pre id="debug-log"></pre>
+  </div>
 
-    <!-- Login Bereich -->
-    <div id="login-section" class="section">
-      <div class="login-container">
-        <div class="logo">
-          <h1>Schul Dashboard</h1>
-          <p>Anmeldeseite</p>
-        </div>
-        <div class="form-container">
-          <form id="login-form">
-            <div class="input-group">
-              <label for="email">E-Mail</label>
-              <input type="email" id="email" name="email" required>
-            </div>
-            <div class="input-group">
-              <label for="password">Passwort</label>
-              <input type="password" id="password" name="password" required>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Anmelden</button>
-              <a href="#" id="forgot-password">Passwort vergessen?</a>
-            </div>
-          </form>
-          <div id="login-message" class="message"></div>
-        </div>
+  <!-- Login Container -->
+  <div id="login-container" class="container">
+    <div class="header">
+      <h1>Schul Dashboard</h1>
+      <p>Anmelden, um fortzufahren</p>
+    </div>
+    
+    <form id="login-form">
+      <div class="input-group">
+        <label for="email">E-Mail</label>
+        <input type="email" id="email" value="admin@example.com" required autocomplete="username">
+      </div>
+      
+      <div class="input-group">
+        <label for="password">Passwort</label>
+        <input type="password" id="password" value="admin123" required autocomplete="current-password">
+      </div>
+      
+      <button type="submit" class="btn btn-block">Anmelden</button>
+      <div class="input-group" style="display: flex; justify-content: space-between;">
+        <button type="button" id="mock-login" class="btn btn-outline">Offline-Modus</button>
+        <button type="button" id="debug-toggle" class="btn btn-outline">Debug</button>
+      </div>
+    </form>
+    
+    <div id="login-loader" class="loader hidden"></div>
+    <div id="login-message" class="message"></div>
+  </div>
+
+  <!-- Dashboard Container -->
+  <div id="dashboard-container" class="dashboard hidden">
+    <div class="dashboard-header">
+      <h1>Dashboard</h1>
+      <div>
+        <span id="user-email"></span> (<span id="user-role"></span>)
+        <button id="logout-btn" class="btn btn-outline">Abmelden</button>
       </div>
     </div>
-
-    <!-- Password Reset Dialog -->
-    <div id="password-reset-dialog" class="modal">
-      <div class="modal-content">
-        <span class="close">&times;</span>
-        <h2>Passwort zurücksetzen</h2>
-        <form id="password-reset-form">
-          <div class="input-group">
-            <label for="reset-email">E-Mail</label>
-            <input type="email" id="reset-email" name="reset-email" required>
-          </div>
-          <button type="submit" class="btn btn-primary">Passwort zurücksetzen</button>
-        </form>
-        <div id="password-reset-message" class="message"></div>
+    
+    <div class="dashboard-cards">
+      <div class="card">
+        <h2 class="card-title">Willkommen</h2>
+        <p>Sie sind erfolgreich angemeldet!</p>
+        <p>Das Dashboard befindet sich im Aufbau.</p>
+      </div>
+      
+      <div class="card">
+        <h2 class="card-title">Standort</h2>
+        <p id="location-info">Kein Standort ausgewählt</p>
       </div>
     </div>
-
-    <!-- Dashboard Bereich -->
-    <div id="dashboard-section" class="section hidden">
-      <header class="header">
-        <div class="header-left">
-          <h1>Schul Dashboard</h1>
+    
+    <div class="card">
+      <h2 class="card-title">Aktionen</h2>
+      <div class="dashboard-cards">
+        <div class="card">
+          <h3 class="card-title">Mitarbeiter verwalten</h3>
+          <p>Verwalten Sie Benutzerkonten und Berechtigungen.</p>
+          <button class="btn">Öffnen</button>
         </div>
-        <div class="header-right">
-          <div class="location-selector">
-            <label for="location-select">Standort:</label>
-            <select id="location-select"></select>
-          </div>
-          <div class="user-info">
-            <span id="user-email"></span>
-            <span id="user-role"></span>
-          </div>
-          <button id="logout-btn" class="btn btn-outline">Abmelden</button>
+        
+        <div class="card">
+          <h3 class="card-title">E-Mails versenden</h3>
+          <p>E-Mails an Benutzer oder externe Empfänger senden.</p>
+          <button class="btn">Öffnen</button>
         </div>
-      </header>
-
-      <div class="dashboard-container">
-        <nav class="sidebar">
-          <ul class="nav-menu">
-            <li class="nav-item" data-page="home">
-              <i class="material-icons">dashboard</i>
-              <span>Dashboard</span>
-            </li>
-            <li class="nav-item developer-lead" data-page="users">
-              <i class="material-icons">people</i>
-              <span>Mitarbeiter</span>
-            </li>
-            <li class="nav-item developer-lead" data-page="emails">
-              <i class="material-icons">email</i>
-              <span>E-Mails</span>
-            </li>
-            <li class="nav-item developer-lead" data-page="buttons">
-              <i class="material-icons">add_circle</i>
-              <span>Buttons</span>
-            </li>
-            <li class="nav-item developer" data-page="admin">
-              <i class="material-icons">admin_panel_settings</i>
-              <span>Admin</span>
-            </li>
-            <li class="nav-item" data-page="settings">
-              <i class="material-icons">settings</i>
-              <span>Einstellungen</span>
-            </li>
-          </ul>
-        </nav>
-
-        <main class="content">
-          <!-- Seiteninhalte werden dynamisch geladen -->
-          <div id="page-container"></div>
-        </main>
+        
+        <div class="card">
+          <h3 class="card-title">Einstellungen</h3>
+          <p>Konfigurieren Sie Ihre persönlichen Einstellungen.</p>
+          <button class="btn">Öffnen</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <script src="js/config.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/dashboard.js"></script>
-  <script src="js/pages/home.js"></script>
-  <script src="js/pages/users.js"></script>
-  <script src="js/pages/emails.js"></script>
-  <script src="js/pages/buttons.js"></script>
-  <script src="js/pages/admin.js"></script>
-  <script src="js/pages/settings.js"></script>
-  <script src="js/app.js"></script>
+  <script>
+    // Konfiguration
+    const config = {
+      apiUrl: 'https://schuldashboard-backend.onrender.com/api',
+      tokenKey: 'schul_dashboard_token',
+      userKey: 'schul_dashboard_user',
+      locationsKey: 'schul_dashboard_locations',
+      currentLocationKey: 'schul_dashboard_current_location'
+    };
+    
+    // Debug-Funktionalität
+    const debug = {
+      enabled: false,
+      log: function(message, data) {
+        if (!this.enabled) return;
+        
+        const logElement = document.getElementById('debug-log');
+        if (!logElement) return;
+        
+        const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
+        let logText = `[${timestamp}] ${message}`;
+        
+        if (data !== undefined) {
+          try {
+            logText += ": " + JSON.stringify(data, null, 2);
+          } catch (e) {
+            logText += ": " + String(data);
+          }
+        }
+        
+        logElement.textContent = logText + "\n" + logElement.textContent;
+        document.getElementById('debug-panel').classList.remove('hidden');
+      },
+      
+      toggleDebug: function() {
+        this.enabled = !this.enabled;
+        document.getElementById('debug-panel').classList.toggle('hidden', !this.enabled);
+        this.log(`Debug-Modus ${this.enabled ? 'aktiviert' : 'deaktiviert'}`);
+      }
+    };
+    
+    // Authentifizierung
+    const auth = {
+      isLoggedIn: function() {
+        return localStorage.getItem(config.tokenKey) !== null;
+      },
+      
+      getUser: function() {
+        const userJson = localStorage.getItem(config.userKey);
+        return userJson ? JSON.parse(userJson) : null;
+      },
+      
+      getLocations: function() {
+        const locationsJson = localStorage.getItem(config.locationsKey);
+        return locationsJson ? JSON.parse(locationsJson) : [];
+      },
+      
+      getCurrentLocation: function() {
+        const locationJson = localStorage.getItem(config.currentLocationKey);
+        return locationJson ? JSON.parse(locationJson) : null;
+      },
+      
+      login: function(token, user, locations) {
+        localStorage.setItem(config.tokenKey, token);
+        localStorage.setItem(config.userKey, JSON.stringify(user));
+        localStorage.setItem(config.locationsKey, JSON.stringify(locations));
+        
+        if (locations && locations.length > 0) {
+          localStorage.setItem(config.currentLocationKey, JSON.stringify(locations[0]));
+        }
+      },
+      
+      logout: function() {
+        localStorage.removeItem(config.tokenKey);
+        localStorage.removeItem(config.userKey);
+        localStorage.removeItem(config.locationsKey);
+        localStorage.removeItem(config.currentLocationKey);
+        window.location.reload();
+      }
+    };
+    
+    // UI-Funktionen
+    function showLoginForm() {
+      document.getElementById('login-container').classList.remove('hidden');
+      document.getElementById('dashboard-container').classList.add('hidden');
+    }
+    
+    function showDashboard() {
+      document.getElementById('login-container').classList.add('hidden');
+      document.getElementById('dashboard-container').classList.remove('hidden');
+      
+      // Benutzerdaten anzeigen
+      const user = auth.getUser();
+      if (user) {
+        document.getElementById('user-email').textContent = user.email;
+        document.getElementById('user-role').textContent = user.role === 'developer' ? 'Entwickler' : 
+                                                           user.role === 'lead' ? 'Leitung' : 
+                                                           user.role === 'office' ? 'Büro' : 'Lehrer';
+      }
+      
+      // Standortdaten anzeigen
+      const currentLocation = auth.getCurrentLocation();
+      if (currentLocation) {
+        document.getElementById('location-info').textContent = `Aktueller Standort: ${currentLocation.name}`;
+      }
+    }
+    
+    function setMessage(elementId, text, type) {
+      const messageElement = document.getElementById(elementId);
+      messageElement.textContent = text;
+      messageElement.className = `message ${type}`;
+    }
+    
+    function toggleLoader(show) {
+      document.getElementById('login-loader').classList.toggle('hidden', !show);
+    }
+    
+    // Login-Handler
+    async function handleLogin(e) {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      debug.log('Login-Versuch', { email, password: '***' });
+      setMessage('login-message', 'Anmeldung läuft...', 'info');
+      toggleLoader(true);
+      
+      try {
+        // API-Aufruf für Login
+        const response = await fetch(`${config.apiUrl}/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email, password })
+        });
+        
+        debug.log('Login-Response', { 
+          status: response.status, 
+          statusText: response.statusText,
+          ok: response.ok
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          debug.log('Login-Fehler', errorData);
+          throw new Error(errorData.message || 'Anmeldung fehlgeschlagen');
+        }
+        
+        const data = await response.json();
+        debug.log('Login erfolgreich', data);
+        
+        // In localStorage speichern
+        auth.login(data.token, data.user, data.locations || []);
+        
+        // Dashboard anzeigen
+        showDashboard();
+      } catch (error) {
+        debug.log('Login-Exception', { message: error.message, stack: error.stack });
+        setMessage('login-message', `Fehler: ${error.message}`, 'error');
+        
+        // Prüfen, ob es ein Netzwerkfehler ist
+        if (error.message.includes('fetch') || error.message.includes('network')) {
+          setMessage('login-message', 
+            'Backend-Server ist nicht erreichbar. Versuchen Sie den Offline-Modus für Tests.', 
+            'error');
+        }
+      } finally {
+        toggleLoader(false);
+      }
+    }
+    
+    // Offline-Login
+    function handleMockLogin() {
+      debug.log('Offline-Login aktiviert');
+      
+      // Mock-Daten
+      const mockUser = {
+        id: '11111111-1111-1111-1111-111111111111',
+        email: 'admin@example.com',
+        role: 'developer'
+      };
+      
+      const mockLocations = [
+        { id: 'loc-1', name: 'Hauptstandort', createdAt: new Date().toISOString() }
+      ];
+      
+      // In localStorage speichern
+      auth.login('mock-token-123', mockUser, mockLocations);
+      
+      setMessage('login-message', 'Offline-Modus aktiviert!', 'success');
+      
+      // Nach kurzer Verzögerung Dashboard anzeigen
+      setTimeout(() => {
+        showDashboard();
+      }, 1000);
+    }
+    
+    // Event-Listener
+    document.addEventListener('DOMContentLoaded', () => {
+      // Prüfen, ob Benutzer angemeldet ist
+      if (auth.isLoggedIn()) {
+        debug.log('Benutzer ist angemeldet, zeige Dashboard');
+        showDashboard();
+      } else {
+        debug.log('Benutzer ist nicht angemeldet, zeige Login');
+        showLoginForm();
+      }
+      
+      // Form-Submission
+      document.getElementById('login-form').addEventListener('submit', handleLogin);
+      
+      // Offline-Modus
+      document.getElementById('mock-login').addEventListener('click', handleMockLogin);
+      
+      // Debug-Toggle
+      document.getElementById('debug-toggle').addEventListener('click', () => debug.toggleDebug());
+      
+      // Logout
+      document.getElementById('logout-btn').addEventListener('click', () => auth.logout());
+    });
+  </script>
 </body>
 </html>
-<!-- Am Ende von body in index.html -->
-<div id="debug-panel" style="position: fixed; bottom: 0; right: 0; background: #f0f0f0; padding: 10px; border: 1px solid #ccc; display: none;">
-  <h4>Debug Info</h4>
-  <pre id="debug-output"></pre>
-</div>
-
-<script>
-  // Debug-Funktion
-  function debugLog(message, data) {
-    console.log(message, data);
-    const debugOutput = document.getElementById('debug-output');
-    const debugPanel = document.getElementById('debug-panel');
-    
-    if (debugOutput && debugPanel) {
-      let text = message;
-      if (data) {
-        try {
-          text += ': ' + JSON.stringify(data, null, 2);
-        } catch (e) {
-          text += ': ' + data;
-        }
-      }
-      
-      debugOutput.textContent += text + '\n';
-      debugPanel.style.display = 'block';
-    }
-  }
-  
-<!-- Direkt nach dem Login-Button in der Form -->
-<button type="button" id="debug-login" class="btn btn-outline" style="margin-top: 10px;">Debug Login</button>
-
-<script>
-  document.getElementById('debug-login').addEventListener('click', async () => {
-    const email = document.getElementById('email').value || 'admin@example.com';
-    const password = document.getElementById('password').value || 'admin123';
-    const loginMessage = document.getElementById('login-message');
-    
-    loginMessage.textContent = 'Teste Backend-Verbindung...';
-    loginMessage.className = 'message info';
-    
-    try {
-      // 1. Prüfe Health-Endpoint
-      loginMessage.textContent = 'Prüfe Health-Endpoint...';
-      try {
-        const healthResponse = await fetch(`${config.apiUrl.replace('/api', '')}/health`);
-        loginMessage.textContent += `\nHealth-Status: ${healthResponse.status}`;
-        if (healthResponse.ok) {
-          const healthData = await healthResponse.json();
-          loginMessage.textContent += ` - ${JSON.stringify(healthData)}`;
-        }
-      } catch (healthError) {
-        loginMessage.textContent += `\nHealth-Check fehlgeschlagen: ${healthError.message}`;
-      }
-      
-      // 2. Simuliere Login mit manueller XHR
-      loginMessage.textContent += '\nSimuliere Login...';
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${config.apiUrl}/auth/login`, true);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      
-      xhr.onload = function() {
-        loginMessage.textContent += `\nServer antwortet mit Status: ${xhr.status}`;
-        if (xhr.status >= 200 && xhr.status < 300) {
-          loginMessage.textContent += `\nAntwort: ${xhr.responseText.substring(0, 100)}...`;
-          loginMessage.className = 'message success';
-        } else {
-          loginMessage.textContent += `\nFehler: ${xhr.statusText} - ${xhr.responseText}`;
-        }
-      };
-      
-      xhr.onerror = function() {
-        loginMessage.textContent += '\nNetzwerkfehler beim Login-Versuch';
-        loginMessage.className = 'message error';
-      };
-      
-      xhr.send(JSON.stringify({ email, password }));
-    } catch (error) {
-      loginMessage.textContent += `\nAllgemeiner Fehler: ${error.message}`;
-      loginMessage.className = 'message error';
-    }
-  });
-</script>
