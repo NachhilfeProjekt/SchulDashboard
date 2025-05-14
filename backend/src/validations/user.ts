@@ -13,9 +13,6 @@ export const createUserSchema = Joi.object({
   locations: Joi.array().items(Joi.string().uuid()).min(1).required().messages({
     'array.min': 'Mindestens ein Standort muss ausgewählt werden',
     'any.required': 'Standorte sind erforderlich'
-  }),
-  createdBy: Joi.string().uuid().required().messages({
-    'any.required': 'Ersteller-ID ist erforderlich'
   })
 });
 
