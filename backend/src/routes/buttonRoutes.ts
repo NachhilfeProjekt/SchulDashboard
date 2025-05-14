@@ -1,7 +1,8 @@
 // backend/src/routes/buttonRoutes.ts
 import express from 'express';
 import { authenticate, authorize, checkLocationAccess } from '../middleware/authMiddleware';
-import { createCustomButton, getButtonsForUser, setButtonPermissions } from '../models/User';
+import { createCustomButton, getButtonsForUser, setButtonPermissions, deleteButton } from '../models/User';
+import pool from '../config/database';
 
 const router = express.Router();
 
@@ -54,6 +55,50 @@ router.post('/:buttonId/permissions', authorize(['developer', 'lead']), async (r
   } catch (error) {
     console.error('Set button permissions error:', error);
     res.status(500).json({ message: 'Fehler beim Aktualisieren der Button-Berechtigungen.' });
+  }
+});
+
+// NEUE ROUTE: Delete button (only for leads and developers)
+router.delete('/:buttonId', authorize(['developer', 'lead']), async (req, res) => {
+  try {
+    const { buttonId } = req.params;
+    console.log(`DELETE /buttons/${buttonId} aufgerufen`);
+    
+    // Überprüfe, ob der Button existiert und dem User/Location gehört
+    const buttonQuery = await pool.query(
+      'SELECT * FROM custom_buttons WHERE id = $1',
+      [buttonId]
+    );
+    
+    if (buttonQuery.rows.length === 0) {
+      return res.status(404).json({ message: 'Button nicht gefunden.' });
+    }
+    
+    const button = buttonQuery.rows[0];
+    
+    // Überprüfe, ob der Benutzer Zugriff auf den Standort des Buttons hat
+    if (req.user.role !== 'developer' && !req.user.locations.includes(button.location_id)) {
+      return res.status(403).json({ message: 'Sie haben keinen Zugriff auf diesen Button.' });
+    }
+    
+    // Lösche zuerst die Berechtigungen des Buttons
+    await pool.query(
+      'DELETE FROM button_permissions WHERE button_id = $1',
+      [buttonId]
+    );
+    
+    // Lösche dann den Button
+    await pool.query(
+      'DELETE FROM custom_buttons WHERE id = $1',
+      [buttonId]
+    );
+    
+    console.log(`Button ${buttonId} erfolgreich gelöscht`);
+    
+    res.json({ message: 'Button erfolgreich gelöscht.' });
+  } catch (error) {
+    console.error('Delete button error:', error);
+    res.status(500).json({ message: 'Fehler beim Löschen des Buttons.' });
   }
 });
 
