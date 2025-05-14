@@ -307,5 +307,62 @@ const EmailPage: React.FC = () => {
     </Box>
   );
 };
+// Füge diese verbesserte Fehlerbehandlung zur EmailPage.tsx hinzu
+
+useEffect(() => {
+  const fetchData = async () => {
+    if (currentLocation) {
+      setLoading(true);
+      try {
+        // Templates abrufen
+        try {
+          const fetchedTemplates = await getEmailTemplates(currentLocation.id);
+          setTemplates(fetchedTemplates);
+        } catch (templateError) {
+          console.error('Error fetching email templates:', templateError);
+          // Silent failure - zeigt einfach eine leere Liste an
+          setTemplates([]);
+        }
+        
+        // Gesendete E-Mails abrufen
+        try {
+          const fetchedSentEmails = await getSentEmails(currentLocation.id);
+          setSentEmails(fetchedSentEmails);
+        } catch (emailsError) {
+          console.error('Error fetching sent emails:', emailsError);
+          // Silent failure - zeigt einfach eine leere Liste an
+          setSentEmails([]);
+        }
+      } catch (error) {
+        console.error('Error fetching email data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+  
+  fetchData();
+}, [currentLocation]);
+
+// Füge diese Funktion für das erneute Senden fehlgeschlagener E-Mails hinzu
+const handleResendEmails = async (emailIds: string[]) => {
+  if (!emailIds.length) return;
+  
+  setLoading(true);
+  try {
+    await resendFailedEmails(emailIds);
+    
+    // Aktualisiere die Liste der gesendeten E-Mails
+    const fetchedSentEmails = await getSentEmails(currentLocation?.id || '');
+    setSentEmails(fetchedSentEmails);
+    
+    setSuccess('E-Mails werden erneut gesendet.');
+  } catch (error) {
+    console.error('Fehler beim erneuten Senden der E-Mails:', error);
+    setError('Fehler beim erneuten Senden der E-Mails. Bitte versuchen Sie es später erneut.');
+  } finally {
+    setLoading(false);
+  }
+};
 
 export default EmailPage;
