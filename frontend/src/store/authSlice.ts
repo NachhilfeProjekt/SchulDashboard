@@ -35,8 +35,8 @@ const authSlice = createSlice({
       state.locations = action.payload.locations;
       state.currentLocation = action.payload.locations[0] || null;
       state.error = null;
-      localStorage.setItem('token', action.payload.token);
-    },
+      localStorage.setItem('schul_dashboard_token', action.payload.token);
+localStorage.removeItem('schul_dashboard_token');
     logout: (state) => {
       state.token = null;
       state.user = null;
