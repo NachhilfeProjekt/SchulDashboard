@@ -1,36 +1,107 @@
-import React, { useState } from 'react';
+// frontend/src/pages/LoginPage.tsx
+import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '../store/store';
-import { login } from '../services/api';
+import { login, testConnection, enableOfflineMode, isOfflineModeEnabled } from '../services/api';
 import { loginSuccess } from '../store/authSlice';
 import { useNavigate } from 'react-router-dom';
-import { Box, Button, Container, TextField, Typography, Link, Paper, Avatar } from '@mui/material';
+import { 
+  Box, Button, Container, TextField, Typography, Paper, Avatar, 
+  Alert, CircularProgress, Divider, List, ListItem, ListItemIcon, 
+  ListItemText, Dialog, DialogTitle, DialogContent, DialogContentText, 
+  DialogActions
+} from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import WifiOffIcon from '@mui/icons-material/WifiOff';
 import PasswordResetDialog from '../components/PasswordResetDialog';
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@example.com');
+  const [password, setPassword] = useState('admin123');
   const [error, setError] = useState('');
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'pending' | 'success' | 'error'>('pending');
+  const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
+  const [offlineMode, setOfflineMode] = useState(isOfflineModeEnabled());
   
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
 
+  // Test der Verbindung beim Laden der Seite
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        const isConnected = await testConnection();
+        setConnectionStatus(isConnected ? 'success' : 'error');
+        setOfflineMode(!isConnected);
+      } catch (err) {
+        setConnectionStatus('error');
+        setOfflineMode(true);
+      }
+    };
+    
+    checkConnection();
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     
     try {
       const response = await login(email, password);
       dispatch(loginSuccess({
         token: response.token,
         user: response.user,
-        locations: response.user.locations,
+        locations: response.locations || [],
       }));
       navigate('/dashboard');
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.message || 'Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre E-Mail und Passwort.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOfflineMode = () => {
+    enableOfflineMode();
+    setOfflineMode(true);
+    
+    try {
+      // Verwende direkt die Login-Funktion mit den Standard-Anmeldedaten
+      const mockLogin = async () => {
+        const response = await login('admin@example.com', 'admin123');
+        dispatch(loginSuccess({
+          token: response.token,
+          user: response.user,
+          locations: response.locations || [],
+        }));
+        navigate('/dashboard');
+      };
+      
+      mockLogin();
     } catch (err) {
-      setError('Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre E-Mail und Passwort.');
+      setError('Fehler beim Aktivieren des Offline-Modus.');
+    }
+  };
+
+  const handleConnectionTest = async () => {
+    setLoading(true);
+    setConnectionDialogOpen(true);
+    
+    try {
+      const isConnected = await testConnection();
+      setConnectionStatus(isConnected ? 'success' : 'error');
+      setOfflineMode(!isConnected);
+    } catch (err) {
+      setConnectionStatus('error');
+      setOfflineMode(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -48,8 +119,16 @@ const LoginPage: React.FC = () => {
           <LockOutlinedIcon />
         </Avatar>
         <Typography component="h1" variant="h5">
-          Anmelden
+          Schul Dashboard
         </Typography>
+        
+        {offlineMode && (
+          <Alert severity="warning" sx={{ mt: 2, width: '100%' }}>
+            <Typography variant="body2">
+              Offline-Modus ist aktiv. Sie arbeiten mit eingeschränkter Funktionalität.
+            </Typography>
+          </Alert>
+        )}
         
         <Paper elevation={3} sx={{ p: 3, mt: 2, width: '100%' }}>
           <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
@@ -64,6 +143,7 @@ const LoginPage: React.FC = () => {
               autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
             />
             <TextField
               margin="normal"
@@ -76,12 +156,13 @@ const LoginPage: React.FC = () => {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
             />
             
             {error && (
-              <Typography color="error" sx={{ mt: 1 }}>
+              <Alert severity="error" sx={{ mt: 2 }}>
                 {error}
-              </Typography>
+              </Alert>
             )}
             
             <Button
@@ -89,22 +170,88 @@ const LoginPage: React.FC = () => {
               fullWidth
               variant="contained"
               sx={{ mt: 3, mb: 2 }}
+              disabled={loading}
+              startIcon={loading ? <CircularProgress size={20} /> : null}
             >
               Anmelden
             </Button>
             
-            <Box sx={{ textAlign: 'center' }}>
-              <Link 
-                href="#" 
-                variant="body2" 
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+              <Button 
+                variant="outlined" 
+                color="primary"
+                onClick={handleOfflineMode}
+                startIcon={<WifiOffIcon />}
+                disabled={loading}
+              >
+                Offline-Modus
+              </Button>
+              
+              <Button 
+                variant="outlined" 
+                color="secondary"
+                onClick={handleConnectionTest}
+                disabled={loading}
+              >
+                Verbindungstest
+              </Button>
+            </Box>
+            
+            <Box sx={{ textAlign: 'center', mt: 2 }}>
+              <Button
+                variant="text"
                 onClick={() => setResetDialogOpen(true)}
+                disabled={loading}
               >
                 Passwort vergessen?
-              </Link>
+              </Button>
             </Box>
           </Box>
         </Paper>
       </Box>
+      
+      <Dialog open={connectionDialogOpen} onClose={() => setConnectionDialogOpen(false)}>
+        <DialogTitle>Verbindungstest</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Prüfe Verbindung zum Backend-Server...
+          </DialogContentText>
+          
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <List>
+              <ListItem>
+                <ListItemIcon>
+                  {connectionStatus === 'success' ? (
+                    <CheckCircleOutlineIcon color="success" />
+                  ) : (
+                    <ErrorOutlineIcon color="error" />
+                  )}
+                </ListItemIcon>
+                <ListItemText 
+                  primary={connectionStatus === 'success' ? 'Verbindung erfolgreich' : 'Verbindung fehlgeschlagen'} 
+                  secondary={connectionStatus === 'success' 
+                    ? 'Der Server ist erreichbar.' 
+                    : 'Der Server konnte nicht erreicht werden. Der Offline-Modus wurde aktiviert.'}
+                />
+              </ListItem>
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConnectionDialogOpen(false)}>
+            Schließen
+          </Button>
+          {connectionStatus === 'error' && (
+            <Button onClick={handleOfflineMode} color="primary">
+              Offline-Modus aktivieren
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
       
       <PasswordResetDialog 
         open={resetDialogOpen} 
