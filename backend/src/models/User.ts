@@ -404,4 +404,52 @@ export const UserModel = {
   comparePasswords,
   createTemporaryToken,
   resetPassword
+// Füge in src/models/User.ts in der getButtonsForUser-Funktion Debug-Ausgaben hinzu
+export const getButtonsForUser = async (userId: string, locationId: string): Promise<CustomButton[]> => {
+  try {
+    console.log(`getButtonsForUser aufgerufen mit userId=${userId}, locationId=${locationId}`);
+    
+    const user = await getUserById(userId);
+    if (!user) {
+      console.log('Benutzer nicht gefunden');
+      throw new Error('Benutzer nicht gefunden');
+    }
+    
+    console.log(`Benutzer gefunden: role=${user.role}`);
+    
+    let query = '';
+    
+    if (user.role === 'developer') {
+      // Developers see all buttons for the location
+      query = `
+        SELECT * FROM custom_buttons
+        WHERE location_id = $1
+        ORDER BY name`;
+      
+      console.log('Verwende Developer-Query');
+      const result = await pool.query(query, [locationId]);
+      console.log(`Developer-Query lieferte ${result.rows.length} Buttons`);
+      return result.rows;
+    } else {
+      // Other users see buttons based on their role or specific permissions
+      query = `
+        SELECT cb.* FROM custom_buttons cb
+        LEFT JOIN button_permissions bp ON cb.id = bp.button_id
+        WHERE cb.location_id = $1
+        AND (
+          bp.role = $2
+          OR bp.user_id = $3
+        )
+        ORDER BY cb.name`;
+      
+      console.log('Verwende Role-based Query');
+      const result = await pool.query(query, [locationId, user.role, userId]);
+      console.log(`Role-based Query lieferte ${result.rows.length} Buttons`);
+      return result.rows;
+    }
+  } catch (error) {
+    console.error(`Fehler beim Abrufen der Buttons für den Benutzer: ${error}`);
+    throw error;
+  }
+};
 };
