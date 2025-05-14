@@ -1,6 +1,5 @@
 // backend/src/validation/user.ts
 import Joi from 'joi';
-import { UserRole } from '../models/User';
 
 export const createUserSchema = Joi.object({
   email: Joi.string().email().required().messages({
@@ -14,6 +13,9 @@ export const createUserSchema = Joi.object({
   locations: Joi.array().items(Joi.string().uuid()).min(1).required().messages({
     'array.min': 'Mindestens ein Standort muss ausgewählt werden',
     'any.required': 'Standorte sind erforderlich'
+  }),
+  createdBy: Joi.string().uuid().required().messages({
+    'any.required': 'Ersteller-ID ist erforderlich'
   })
 });
 
@@ -22,8 +24,7 @@ export const loginSchema = Joi.object({
     'string.email': 'Bitte geben Sie eine gültige E-Mail-Adresse ein',
     'any.required': 'E-Mail ist erforderlich'
   }),
-  password: Joi.string().min(8).required().messages({
-    'string.min': 'Passwort muss mindestens 8 Zeichen lang sein',
+  password: Joi.string().required().messages({
     'any.required': 'Passwort ist erforderlich'
   })
 });
