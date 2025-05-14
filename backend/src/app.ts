@@ -48,4 +48,67 @@ app.get('/health', (req, res) => {
   });
 });
 
-//
+// API-Routen
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/locations', locationRoutes);
+app.use('/api/buttons', buttonRoutes);
+app.use('/api/emails', emailRoutes);
+
+// Alternative Routen ohne /api Präfix für maximale Kompatibilität
+app.use('/auth', authRoutes);
+app.use('/users', userRoutes);
+app.use('/locations', locationRoutes);
+app.use('/buttons', buttonRoutes);
+app.use('/emails', emailRoutes);
+
+// Datenbank-Initialisierungsroute - explizit außerhalb der initializeDatabase-Funktion
+app.get('/init-database', async (req: express.Request, res: express.Response) => {
+  try {
+    const success = await initializeDatabase();
+    if (success) {
+      res.status(200).json({ 
+        status: 'OK',
+        message: 'Datenbank erfolgreich initialisiert'
+      });
+    } else {
+      res.status(500).json({ 
+        status: 'ERROR',
+        message: 'Fehler bei der Datenbankinitialisierung'
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'ERROR',
+      message: `Unerwarteter Fehler: ${error.message}`
+    });
+  }
+});
+
+// Fehlerbehandlung
+app.use(notFound);
+app.use(errorHandler);
+
+const PORT = process.env.PORT || 10000;
+
+// Server starten, wenn dies das Hauptmodul ist
+if (require.main === module) {
+  // Initialisiere die Datenbank, bevor der Server startet
+  initializeDatabase()
+    .then(success => {
+      if (success) {
+        logger.info('Datenbank erfolgreich initialisiert.');
+      } else {
+        logger.warn('Fehler bei der Datenbank-Initialisierung. Der Server wird trotzdem gestartet.');
+      }
+      // Starte den Server
+      app.listen(PORT, () => {
+        logger.info(`Server running on port ${PORT}`);
+      });
+    })
+    .catch(err => {
+      logger.error(`Fehler beim Starten des Servers: ${err}`);
+    });
+}
+
+export default app;
