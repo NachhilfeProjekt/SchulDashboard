@@ -23,17 +23,21 @@ const ManageButtonsPage: React.FC = () => {
     url: '',
     locationId: currentLocation?.id || ''
   });
-  const [permissions, setPermissions] = useState<{role?: string, userId?: string}[]>([]);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
 
   useEffect(() => {
-    if (currentLocation && user) {
+    if (currentLocation) {
       const fetchButtons = async () => {
-        const data = await getButtonsForUser(user.id, currentLocation.id);
-        setButtons(data);
+        try {
+          const data = await getButtonsForUser(currentLocation.id);
+          setButtons(data);
+        } catch (error) {
+          console.error('Error fetching buttons:', error);
+        }
       };
       fetchButtons();
     }
-  }, [currentLocation, user]);
+  }, [currentLocation]);
 
   const handleCreateButton = async () => {
     try {
@@ -45,8 +49,8 @@ const ManageButtonsPage: React.FC = () => {
         locationId: currentLocation?.id || ''
       });
       
-      if (currentLocation && user) {
-        const data = await getButtonsForUser(user.id, currentLocation.id);
+      if (currentLocation) {
+        const data = await getButtonsForUser(currentLocation.id);
         setButtons(data);
       }
     } catch (error) {
@@ -56,7 +60,7 @@ const ManageButtonsPage: React.FC = () => {
 
   const handleOpenPermissions = (button: any) => {
     setSelectedButton(button);
-    setPermissions([]);
+    setSelectedRoles([]);
     setPermissionsDialog(true);
   };
 
@@ -64,25 +68,40 @@ const ManageButtonsPage: React.FC = () => {
     if (!selectedButton) return;
     
     try {
-      await setButtonPermissions(selectedButton.id, permissions);
+      await setButtonPermissions(selectedButton.id, { roles: selectedRoles });
       setPermissionsDialog(false);
+      
+      // Refresh buttons
+      if (currentLocation) {
+        const data = await getButtonsForUser(currentLocation.id);
+        setButtons(data);
+      }
     } catch (error) {
       console.error('Error saving permissions:', error);
     }
   };
 
-  const togglePermission = (role: string) => {
-    setPermissions(prev => {
-      const existing = prev.find(p => p.role === role);
-      if (existing) {
-        return prev.filter(p => p.role !== role);
+  const toggleRole = (role: string) => {
+    setSelectedRoles(prev => {
+      if (prev.includes(role)) {
+        return prev.filter(r => r !== role);
       } else {
-        return [...prev, { role }];
+        return [...prev, role];
       }
     });
   };
 
   if (!user || !currentLocation) return null;
+
+  // Only leads and developers can manage buttons
+  if (user.role !== 'developer' && user.role !== 'lead') {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h5">Keine Berechtigung</Typography>
+        <Typography>Sie haben keine Berechtigung, diese Seite zu sehen.</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: 3 }}>
@@ -126,6 +145,11 @@ const ManageButtonsPage: React.FC = () => {
                   </TableCell>
                 </TableRow>
               ))}
+              {buttons.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={3} align="center">Keine Buttons gefunden</TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </TableContainer>
@@ -136,6 +160,8 @@ const ManageButtonsPage: React.FC = () => {
         <DialogContent>
           <Box sx={{ mt: 2 }}>
             <TextField
+              label="Name"
+              full<TextField
               label="Name"
               fullWidth
               value={newButton.name}
@@ -174,22 +200,22 @@ const ManageButtonsPage: React.FC = () => {
           <List>
             <ListItem>
               <Checkbox
-                checked={permissions.some(p => p.role === 'teacher')}
-                onChange={() => togglePermission('teacher')}
+                checked={selectedRoles.includes('teacher')}
+                onChange={() => toggleRole('teacher')}
               />
               <ListItemText primary="Lehrer" />
             </ListItem>
             <ListItem>
               <Checkbox
-                checked={permissions.some(p => p.role === 'office')}
-                onChange={() => togglePermission('office')}
+                checked={selectedRoles.includes('office')}
+                onChange={() => toggleRole('office')}
               />
               <ListItemText primary="Büro" />
             </ListItem>
             <ListItem>
               <Checkbox
-                checked={permissions.some(p => p.role === 'lead')}
-                onChange={() => togglePermission('lead')}
+                checked={selectedRoles.includes('lead')}
+                onChange={() => toggleRole('lead')}
               />
               <ListItemText primary="Leitung" />
             </ListItem>
