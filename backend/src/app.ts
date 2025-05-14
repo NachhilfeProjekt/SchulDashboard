@@ -13,9 +13,25 @@ import logger from './config/logger';
 
 const app = express();
 
-// Middleware
+// CORS Konfiguration
+const allowedOrigins = [
+  'https://dashboard-frontend-p693.onrender.com',
+  'http://localhost:3000',
+  // Fügen Sie hier weitere Frontend-Domains hinzu
+];
+
 app.use(cors({
-  origin: '*', // Während der Entwicklung, später einschränken
+  origin: function(origin, callback) {
+    // Erlaube Anfragen ohne Origin-Header (z.B. Mobile-Apps, Postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      logger.warn(`CORS blockiert für Origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -34,7 +50,11 @@ app.use('/api/emails', emailRoutes);
 
 // Health check
 app.get('/health', (req: express.Request, res: express.Response) => {
-  res.status(200).json({ status: 'OK' });
+  res.status(200).json({ 
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || 'development'
+  });
 });
 
 // Error handling
@@ -46,7 +66,7 @@ const PORT = process.env.PORT || 5000;
 // Server nur starten, wenn dies das Hauptmodul ist
 if (require.main === module) {
   app.listen(PORT, () => {
-    logger.info(`Server running on port ${PORT}`);
+    logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
   });
 }
 
