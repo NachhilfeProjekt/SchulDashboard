@@ -81,3 +81,4 @@ VALUES (
   'developer',
   true
 );
+);
