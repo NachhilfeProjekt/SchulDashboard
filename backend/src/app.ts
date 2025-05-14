@@ -1,4 +1,3 @@
-// backend/src/app.ts
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -14,7 +13,10 @@ import logger from './config/logger';
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['https://schuldashboard-frontend.onrender.com', 'http://localhost:3000'],
+  credentials: true
+}));
 app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
@@ -29,7 +31,7 @@ app.use('/api/emails', emailRoutes);
 
 // Health check
 app.get('/health', (req: express.Request, res: express.Response) => {
-  res.status(200).json({ status: 'OK' });
+  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 // Error handling
