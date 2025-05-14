@@ -4,8 +4,24 @@ import { getUserByEmail, comparePasswords, getUserLocations, resetPassword, crea
 import { generateToken, sendPasswordResetEmail, sendTemporaryPasswordEmail } from '../services/authService';
 import { v4 as uuidv4 } from 'uuid';
 import { validate } from '../middleware/validationMiddleware';
-import { loginSchema, passwordResetSchema, createUserSchema } from '../validation/user';
-import logger from '../config/logger';
+import Joi from 'joi';
+
+// Definiere die Schemas direkt hier, falls der Import nicht funktioniert
+const loginSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().required()
+});
+
+const passwordResetSchema = Joi.object({
+  token: Joi.string().required(),
+  newPassword: Joi.string().min(8).required()
+});
+
+const createUserSchema = Joi.object({
+  email: Joi.string().email().required(),
+  role: Joi.string().valid('developer', 'lead', 'office', 'teacher').required(),
+  locations: Joi.array().items(Joi.string()).min(1).required()
+});
 
 const router = express.Router();
 
@@ -34,11 +50,11 @@ router.post('/login', validate(loginSchema), async (req, res) => {
         id: user.id,
         email: user.email,
         role: user.role,
-        locations: locationIds
+        locations: locations
       }
     });
   } catch (error) {
-    logger.error(`Login-Fehler: ${error}`);
+    console.error(`Login-Fehler: ${error}`);
     res.status(500).json({ message: 'Serverfehler bei der Anmeldung.' });
   }
 });
@@ -46,12 +62,12 @@ router.post('/login', validate(loginSchema), async (req, res) => {
 router.post('/request-password-reset', async (req, res) => {
   try {
     const { email } = req.body;
-    const success = await sendPasswordResetEmail(email);
+    await sendPasswordResetEmail(email);
 
     // Immer eine positive Antwort geben, um keine Informationen über existierende Konten preiszugeben
     res.json({ message: 'Falls ein Konto mit dieser E-Mail existiert, wurde eine E-Mail mit Anweisungen zum Zurücksetzen des Passworts gesendet.' });
   } catch (error) {
-    logger.error(`Fehler bei Passwort-Zurücksetzungsanfrage: ${error}`);
+    console.error(`Fehler bei Passwort-Zurücksetzungsanfrage: ${error}`);
     res.status(500).json({ message: 'Fehler beim Anfordern des Passwort-Zurücksetzens.' });
   }
 });
@@ -67,14 +83,15 @@ router.post('/reset-password', validate(passwordResetSchema), async (req, res) =
       res.status(400).json({ message: 'Ungültiger oder abgelaufener Token.' });
     }
   } catch (error) {
-    logger.error(`Fehler beim Zurücksetzen des Passworts: ${error}`);
+    console.error(`Fehler beim Zurücksetzen des Passworts: ${error}`);
     res.status(500).json({ message: 'Fehler beim Zurücksetzen des Passworts.' });
   }
 });
 
 router.post('/create-user', validate(createUserSchema), async (req, res) => {
   try {
-    const { email, role, locations, createdBy } = req.body;
+    const { email, role, locations } = req.body;
+    const createdBy = req.user?.userId || '11111111-1111-1111-1111-111111111111'; // Default admin ID
     
     // Prüfen, ob ein Benutzer mit dieser E-Mail bereits existiert
     const existingUser = await getUserByEmail(email);
@@ -95,7 +112,7 @@ router.post('/create-user', validate(createUserSchema), async (req, res) => {
       userId: user.id
     });
   } catch (error) {
-    logger.error(`Fehler beim Erstellen des Benutzers: ${error}`);
+    console.error(`Fehler beim Erstellen des Benutzers: ${error}`);
     res.status(500).json({ message: 'Fehler beim Erstellen des Benutzers.' });
   }
 });
