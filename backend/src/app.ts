@@ -74,7 +74,27 @@ if (require.main === module) {
       } else {
         logger.warn('Fehler bei der Datenbank-Initialisierung. Der Server wird trotzdem gestartet.');
       }
-      
+      app.get('/init-database', async (req: express.Request, res: express.Response) => {
+  try {
+    const success = await initializeDatabase();
+    if (success) {
+      res.status(200).json({ 
+        status: 'OK',
+        message: 'Datenbank erfolgreich initialisiert'
+      });
+    } else {
+      res.status(500).json({ 
+        status: 'ERROR',
+        message: 'Fehler bei der Datenbankinitialisierung'
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'ERROR',
+      message: `Unerwarteter Fehler: ${error.message}`
+    });
+  }
+});
       // Starte den Server
       app.listen(PORT, () => {
         logger.info(`Server running on port ${PORT}`);
