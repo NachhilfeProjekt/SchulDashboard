@@ -98,3 +98,116 @@ const DashboardPage: React.FC = () => {
         id: 'error-fallback',
         name: 'Fallback Button (Fehler)',
         url: 'https://example.com',
+        location_id: currentLocation.id,
+        created_by: 'system',
+        created_at: new Date().toISOString()
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Explizite Navigationsfunktion mit Logging
+  const handleNavigate = (path: string) => {
+    console.log(`Navigation zu ${path} wurde angefordert`);
+    try {
+      navigate(path);
+    } catch (error) {
+      console.error(`Fehler bei der Navigation zu ${path}:`, error);
+      // Fallback: Direktes URL-Update, falls Navigate fehlschlägt
+      window.location.href = path;
+    }
+  };
+
+  if (!user || !currentLocation) return null;
+
+  const isDeveloper = user.role === 'developer';
+  const isLead = user.role === 'lead';
+
+  const systemButtons = [
+    { name: 'Mitarbeiter verwalten', path: '/manage-users', roles: ['developer', 'lead'] },
+    { name: 'E-Mails versenden', path: '/email', roles: ['developer', 'lead'] },
+    { name: 'Buttons verwalten', path: '/manage-buttons', roles: ['developer', 'lead'] },
+    { name: 'Leitungsaccount erstellen', path: '/create-lead', roles: ['developer'] },
+    { name: 'Admin', path: '/admin', roles: ['developer'] },
+    { name: 'Einstellungen', path: '/settings', roles: ['developer', 'lead', 'office', 'teacher'] },
+  ];
+
+  const filteredSystemButtons = systemButtons.filter(button => 
+    button.roles.includes(user.role)
+  );
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Paper sx={{ p: 3, mb: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          Willkommen, {user.email}
+        </Typography>
+        
+        <Typography variant="h6" gutterBottom>
+          Aktueller Standort: {currentLocation.name}
+        </Typography>
+      </Paper>
+      
+      <Typography variant="h5" gutterBottom>
+        System-Funktionen
+      </Typography>
+      
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        {filteredSystemButtons.map((button, index) => (
+          <Grid item xs={12} sm={6} md={4} key={index}>
+            <Button
+              variant="contained"
+              fullWidth
+              sx={{ height: '100px' }}
+              onClick={(e) => {
+                e.preventDefault(); // Verhindert Standard-Ereignisverarbeitung
+                console.log(`Button ${button.name} wurde geklickt, navigiere zu ${button.path}`);
+                handleNavigate(button.path);
+              }}
+            >
+              {button.name}
+            </Button>
+          </Grid>
+        ))}
+      </Grid>
+      
+      {customButtons.length > 0 && (
+        <>
+          <Typography variant="h5" gutterBottom>
+            Benutzerdefinierte Links
+          </Typography>
+          
+          <Grid container spacing={3}>
+            {customButtons.map((button) => (
+              <Grid item xs={12} sm={6} md={4} key={button.id}>
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  sx={{ height: '100px' }}
+                  onClick={() => {
+                    console.log(`Öffne URL: ${button.url}`);
+                    // Explizit ein neues Fenster öffnen
+                    const newWindow = window.open(button.url, '_blank', 'noopener,noreferrer');
+                    // Sicherheitsabfrage für Popup-Blocker
+                    if (newWindow) newWindow.opener = null;
+                  }}
+                >
+                  {button.name}
+                </Button>
+              </Grid>
+            ))}
+          </Grid>
+        </>
+      )}
+      
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <CircularProgress />
+        </Box>
+      )}
+    </Box>
+  );
+};
+
+export default DashboardPage;
