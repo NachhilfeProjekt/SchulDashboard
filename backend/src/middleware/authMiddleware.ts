@@ -75,7 +75,36 @@ export const checkLocationAccess = async (req: Request, res: Response, next: Nex
     console.log('User ist Developer - Zugriff erlaubt');
     return next();
   }
+// backend/src/middleware/authMiddleware.ts
+export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.header('Authorization');
+  const token = authHeader?.replace('Bearer ', '');
+  
+  console.log('Auth Header:', authHeader);
+  console.log('Extrahierter Token:', token ? token.substring(0, 20) + '...' : 'kein Token');
+  
+  if (!token) {
+    console.log('Kein Token in der Anfrage gefunden');
+    return res.status(401).json({ message: 'Authentifizierung erforderlich' });
+  }
 
+  try {
+    console.log('Versuche Token zu verifizieren');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
+      userId: string;
+      role: UserRole;
+      locations: string[];
+    };
+    
+    console.log('Token erfolgreich verifiziert:', decoded);
+    
+    req.user = decoded;
+    next();
+  } catch (error) {
+    console.error('Token-Verifizierung fehlgeschlagen:', error);
+    res.status(401).json({ message: 'Ungültiger Token' });
+  }
+};
   // Check if user has access to this location
   if (!req.user.locations.includes(locationId)) {
     console.log('User hat keinen Zugriff auf diesen Standort');
