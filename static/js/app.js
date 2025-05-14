@@ -1,3 +1,38 @@
+// In static/js/app.js am Anfang der handleLogin-Funktion
+async function handleLogin(e) {
+  e.preventDefault();
+  console.log('Login form submitted');
+  
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const loginMessage = document.getElementById('login-message');
+  
+  loginMessage.textContent = 'Versuche Anmeldung...';
+  loginMessage.className = 'message info';
+  
+  // Prüfe zuerst, ob der Server erreichbar ist
+  try {
+    console.log('Checking if backend is reachable...');
+    const healthCheck = await fetch(`${config.apiUrl.replace('/api', '')}/health`, {
+      method: 'GET',
+      mode: 'cors'
+    });
+    
+    if (!healthCheck.ok) {
+      throw new Error(`Server nicht erreichbar, Status: ${healthCheck.status}`);
+    }
+    
+    console.log('Backend health check successful, proceeding with login');
+  } catch (error) {
+    console.error('Health check failed:', error);
+    loginMessage.textContent = `Backend-Server ist nicht erreichbar: ${error.message}. Bitte versuchen Sie es später erneut.`;
+    loginMessage.className = 'message error';
+    return;
+  }
+  
+  // Fortfahren mit der Login-Logik...
+  // ...Rest des Codes bleibt unverändert...
+}
 // Hauptanwendungslogik
 document.addEventListener('DOMContentLoaded', () => {
   console.log('App initialized');
