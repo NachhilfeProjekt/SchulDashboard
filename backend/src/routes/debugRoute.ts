@@ -121,4 +121,101 @@ router.get('/env', (req, res) => {
   });
 });
 
+// Endpunkt zum Überprüfen der Buttons
+router.get('/check-buttons', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM custom_buttons');
+    
+    res.json({
+      message: 'Buttons in der Datenbank',
+      count: result.rows.length,
+      buttons: result.rows
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Fehler beim Abrufen der Buttons',
+      error: error.message
+    });
+  }
+});
+
+// Endpunkt zum Erstellen eines Test-Buttons
+router.get('/create-test-button', async (req, res) => {
+  try {
+    const adminId = '11111111-1111-1111-1111-111111111111';
+    const locationId = '22222222-2222-2222-2222-222222222222';
+    
+    const result = await pool.query(`
+      INSERT INTO custom_buttons (name, url, location_id, created_by)
+      VALUES ('Test-Button', 'https://example.com', $1, $2)
+      RETURNING *
+    `, [locationId, adminId]);
+    
+    // Berechtigungen hinzufügen
+    await pool.query(`
+      INSERT INTO button_permissions (button_id, role)
+      VALUES ($1, 'teacher'), ($1, 'office'), ($1, 'lead'), ($1, 'developer')
+    `, [result.rows[0].id]);
+    
+    res.json({
+      message: 'Test-Button erfolgreich erstellt',
+      button: result.rows[0]
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Fehler beim Erstellen des Test-Buttons',
+      error: error.message
+    });
+  }
+});
+
+// Endpunkt zum Überprüfen/Korrigieren der Fremdschlüssel
+router.get('/fix-relations', async (req, res) => {
+  try {
+    // Überprüfen, ob die Tabellen existieren
+    const tablesQuery = await pool.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+    `);
+    
+    const tables = tablesQuery.rows.map(row => row.table_name);
+    
+    // Überprüfen, ob die erforderlichen Tabellen vorhanden sind
+    const requiredTables = ['users', 'locations', 'user_locations', 'custom_buttons', 'button_permissions'];
+    const missingTables = requiredTables.filter(table => !tables.includes(table));
+    
+    if (missingTables.length > 0) {
+      return res.json({
+        message: 'Fehlende Tabellen',
+        missingTables
+      });
+    }
+    
+    // Jetzt prüfen wir die Inhalte der Tabellen
+    const usersCount = await pool.query('SELECT COUNT(*) FROM users');
+    const locationsCount = await pool.query('SELECT COUNT(*) FROM locations');
+    const userLocationsCount = await pool.query('SELECT COUNT(*) FROM user_locations');
+    const buttonsCount = await pool.query('SELECT COUNT(*) FROM custom_buttons');
+    const buttonPermissionsCount = await pool.query('SELECT COUNT(*) FROM button_permissions');
+    
+    res.json({
+      message: 'Datenbank-Tabellen überprüft',
+      tables,
+      counts: {
+        users: parseInt(usersCount.rows[0].count),
+        locations: parseInt(locationsCount.rows[0].count),
+        userLocations: parseInt(userLocationsCount.rows[0].count),
+        buttons: parseInt(buttonsCount.rows[0].count),
+        buttonPermissions: parseInt(buttonPermissionsCount.rows[0].count)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Fehler beim Überprüfen der Datenbank-Relationen',
+      error: error.message
+    });
+  }
+});
+
 export default router;
