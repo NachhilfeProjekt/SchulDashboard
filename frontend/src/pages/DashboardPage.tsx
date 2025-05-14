@@ -1,14 +1,16 @@
+// frontend/src/pages/DashboardPage.tsx
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { RootState } from '../store/store';
 import axios from 'axios';
 import { Box, Button, Grid, Typography, Paper, CircularProgress } from '@mui/material';
 
-// Einfache Komponentenversion ohne React Router-Abhängigkeiten
 const DashboardPage: React.FC = () => {
   const { user, currentLocation } = useSelector((state: RootState) => state.auth);
   const [customButtons, setCustomButtons] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user && currentLocation) {
@@ -52,6 +54,11 @@ const DashboardPage: React.FC = () => {
     }
   };
 
+  // Handle navigation with React Router
+  const handleNavigation = (path: string) => {
+    navigate(path);
+  };
+
   // Fallback, wenn kein Benutzer oder Standort verfügbar ist
   if (!user || !currentLocation) {
     return (
@@ -81,39 +88,36 @@ const DashboardPage: React.FC = () => {
         {(user.role === 'developer' || user.role === 'lead') && (
           <>
             <Grid item xs={12} sm={6} md={4}>
-              <a href="/manage-users" style={{ textDecoration: 'none', display: 'block', width: '100%' }}>
-                <Button
-                  variant="contained"
-                  fullWidth
-                  sx={{ height: '100px' }}
-                >
-                  Mitarbeiter verwalten
-                </Button>
-              </a>
+              <Button
+                variant="contained"
+                fullWidth
+                sx={{ height: '100px' }}
+                onClick={() => handleNavigation('/manage-users')}
+              >
+                Mitarbeiter verwalten
+              </Button>
             </Grid>
             
             <Grid item xs={12} sm={6} md={4}>
-              <a href="/email" style={{ textDecoration: 'none', display: 'block', width: '100%' }}>
-                <Button
-                  variant="contained"
-                  fullWidth
-                  sx={{ height: '100px' }}
-                >
-                  E-Mails versenden
-                </Button>
-              </a>
+              <Button
+                variant="contained"
+                fullWidth
+                sx={{ height: '100px' }}
+                onClick={() => handleNavigation('/email')}
+              >
+                E-Mails versenden
+              </Button>
             </Grid>
             
             <Grid item xs={12} sm={6} md={4}>
-              <a href="/manage-buttons" style={{ textDecoration: 'none', display: 'block', width: '100%' }}>
-                <Button
-                  variant="contained"
-                  fullWidth
-                  sx={{ height: '100px' }}
-                >
-                  Buttons verwalten
-                </Button>
-              </a>
+              <Button
+                variant="contained"
+                fullWidth
+                sx={{ height: '100px' }}
+                onClick={() => handleNavigation('/manage-buttons')}
+              >
+                Buttons verwalten
+              </Button>
             </Grid>
           </>
         )}
@@ -121,41 +125,38 @@ const DashboardPage: React.FC = () => {
         {user.role === 'developer' && (
           <>
             <Grid item xs={12} sm={6} md={4}>
-              <a href="/create-lead" style={{ textDecoration: 'none', display: 'block', width: '100%' }}>
-                <Button
-                  variant="contained"
-                  fullWidth
-                  sx={{ height: '100px' }}
-                >
-                  Leitungsaccount erstellen
-                </Button>
-              </a>
+              <Button
+                variant="contained"
+                fullWidth
+                sx={{ height: '100px' }}
+                onClick={() => handleNavigation('/create-lead')}
+              >
+                Leitungsaccount erstellen
+              </Button>
             </Grid>
             
             <Grid item xs={12} sm={6} md={4}>
-              <a href="/admin" style={{ textDecoration: 'none', display: 'block', width: '100%' }}>
-                <Button
-                  variant="contained"
-                  fullWidth
-                  sx={{ height: '100px' }}
-                >
-                  Admin
-                </Button>
-              </a>
+              <Button
+                variant="contained"
+                fullWidth
+                sx={{ height: '100px' }}
+                onClick={() => handleNavigation('/admin')}
+              >
+                Admin
+              </Button>
             </Grid>
           </>
         )}
         
         <Grid item xs={12} sm={6} md={4}>
-          <a href="/settings" style={{ textDecoration: 'none', display: 'block', width: '100%' }}>
-            <Button
-              variant="contained"
-              fullWidth
-              sx={{ height: '100px' }}
-            >
-              Einstellungen
-            </Button>
-          </a>
+          <Button
+            variant="contained"
+            fullWidth
+            sx={{ height: '100px' }}
+            onClick={() => handleNavigation('/settings')}
+          >
+            Einstellungen
+          </Button>
         </Grid>
       </Grid>
       
@@ -188,22 +189,6 @@ const DashboardPage: React.FC = () => {
           <CircularProgress />
         </Box>
       )}
-      
-      <Box sx={{ mt: 4 }}>
-        <a href="/login" style={{ textDecoration: 'none' }} onClick={(e) => {
-          e.preventDefault();
-          console.log('Abmelden...');
-          localStorage.clear();
-          window.location.href = '/login';
-        }}>
-          <Button 
-            variant="outlined" 
-            color="error"
-          >
-            Abmelden
-          </Button>
-        </a>
-      </Box>
     </Box>
   );
 };
