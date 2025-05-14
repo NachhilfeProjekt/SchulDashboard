@@ -1,8 +1,9 @@
+// frontend/src/components/Sidebar.tsx
 import React from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
 import { Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
 import EmailIcon from '@mui/icons-material/Email';
@@ -15,6 +16,22 @@ const drawerWidth = 240;
 const Sidebar: React.FC = () => {
   const { user, currentLocation } = useSelector((state: RootState) => state.auth);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    console.log("Sidebar: Aktueller Pfad:", location.pathname);
+  }, [location]);
+
+  const handleNavigation = (path: string) => {
+    console.log(`Sidebar: Navigation zu ${path} angefordert`);
+    try {
+      navigate(path);
+    } catch (error) {
+      console.error(`Sidebar: Fehler bei Navigation zu ${path}:`, error);
+      // Fallback
+      window.location.href = path;
+    }
+  };
 
   if (!user || !currentLocation) return null;
 
@@ -34,7 +51,10 @@ const Sidebar: React.FC = () => {
       <Box sx={{ overflow: 'auto' }}>
         <List>
           <ListItem disablePadding>
-            <ListItemButton onClick={() => navigate('/dashboard')}>
+            <ListItemButton 
+              onClick={() => handleNavigation('/dashboard')}
+              selected={location.pathname === '/dashboard'}
+            >
               <ListItemIcon>
                 <DashboardIcon />
               </ListItemIcon>
@@ -45,7 +65,10 @@ const Sidebar: React.FC = () => {
           {(isDeveloper || isLead) && (
             <>
               <ListItem disablePadding>
-                <ListItemButton onClick={() => navigate('/manage-users')}>
+                <ListItemButton 
+                  onClick={() => handleNavigation('/manage-users')}
+                  selected={location.pathname === '/manage-users'}
+                >
                   <ListItemIcon>
                     <PeopleIcon />
                   </ListItemIcon>
@@ -54,7 +77,10 @@ const Sidebar: React.FC = () => {
               </ListItem>
               
               <ListItem disablePadding>
-                <ListItemButton onClick={() => navigate('/email')}>
+                <ListItemButton 
+                  onClick={() => handleNavigation('/email')}
+                  selected={location.pathname === '/email'}
+                >
                   <ListItemIcon>
                     <EmailIcon />
                   </ListItemIcon>
@@ -63,7 +89,10 @@ const Sidebar: React.FC = () => {
               </ListItem>
               
               <ListItem disablePadding>
-                <ListItemButton onClick={() => navigate('/manage-buttons')}>
+                <ListItemButton 
+                  onClick={() => handleNavigation('/manage-buttons')}
+                  selected={location.pathname === '/manage-buttons'}
+                >
                   <ListItemIcon>
                     <AddCircleIcon />
                   </ListItemIcon>
@@ -75,7 +104,10 @@ const Sidebar: React.FC = () => {
           
           {isDeveloper && (
             <ListItem disablePadding>
-              <ListItemButton onClick={() => navigate('/admin')}>
+              <ListItemButton 
+                onClick={() => handleNavigation('/admin')}
+                selected={location.pathname === '/admin'}
+              >
                 <ListItemIcon>
                   <AdminPanelSettingsIcon />
                 </ListItemIcon>
@@ -85,7 +117,10 @@ const Sidebar: React.FC = () => {
           )}
           
           <ListItem disablePadding>
-            <ListItemButton onClick={() => navigate('/settings')}>
+            <ListItemButton 
+              onClick={() => handleNavigation('/settings')}
+              selected={location.pathname === '/settings'}
+            >
               <ListItemIcon>
                 <SettingsIcon />
               </ListItemIcon>
