@@ -128,3 +128,51 @@
   <script src="js/app.js"></script>
 </body>
 </html>
+<!-- Am Ende von body in index.html -->
+<div id="debug-panel" style="position: fixed; bottom: 0; right: 0; background: #f0f0f0; padding: 10px; border: 1px solid #ccc; display: none;">
+  <h4>Debug Info</h4>
+  <pre id="debug-output"></pre>
+</div>
+
+<script>
+  // Debug-Funktion
+  function debugLog(message, data) {
+    console.log(message, data);
+    const debugOutput = document.getElementById('debug-output');
+    const debugPanel = document.getElementById('debug-panel');
+    
+    if (debugOutput && debugPanel) {
+      let text = message;
+      if (data) {
+        try {
+          text += ': ' + JSON.stringify(data, null, 2);
+        } catch (e) {
+          text += ': ' + data;
+        }
+      }
+      
+      debugOutput.textContent += text + '\n';
+      debugPanel.style.display = 'block';
+    }
+  }
+  
+  // Aktiviere Debug-Modus mit Abfrage-Parameter ?debug=true
+  if (window.location.search.includes('debug=true')) {
+    document.getElementById('debug-panel').style.display = 'block';
+    debugLog('Debug mode enabled');
+    
+    // Patch fetch für Debugging
+    const originalFetch = window.fetch;
+    window.fetch = async function(url, options) {
+      debugLog(`Fetch request to: ${url}`, options);
+      try {
+        const response = await originalFetch(url, options);
+        debugLog(`Fetch response status: ${response.status}`);
+        return response;
+      } catch (error) {
+        debugLog(`Fetch error: ${error.message}`);
+        throw error;
+      }
+    };
+  }
+</script>
