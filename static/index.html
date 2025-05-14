@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schul Dashboard</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="app" class="app-container">
+    <div class="hidden" id="loading-container">
+      <div class="loader"></div>
+      <p>Lädt...</p>
+    </div>
+
+    <!-- Login Bereich -->
+    <div id="login-section" class="section">
+      <div class="login-container">
+        <div class="logo">
+          <h1>Schul Dashboard</h1>
+          <p>Anmeldeseite</p>
+        </div>
+        <div class="form-container">
+          <form id="login-form">
+            <div class="input-group">
+              <label for="email">E-Mail</label>
+              <input type="email" id="email" name="email" required>
+            </div>
+            <div class="input-group">
+              <label for="password">Passwort</label>
+              <input type="password" id="password" name="password" required>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Anmelden</button>
+              <a href="#" id="forgot-password">Passwort vergessen?</a>
+            </div>
+          </form>
+          <div id="login-message" class="message"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Password Reset Dialog -->
+    <div id="password-reset-dialog" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Passwort zurücksetzen</h2>
+        <form id="password-reset-form">
+          <div class="input-group">
+            <label for="reset-email">E-Mail</label>
+            <input type="email" id="reset-email" name="reset-email" required>
+          </div>
+          <button type="submit" class="btn btn-primary">Passwort zurücksetzen</button>
+        </form>
+        <div id="password-reset-message" class="message"></div>
+      </div>
+    </div>
+
+    <!-- Dashboard Bereich -->
+    <div id="dashboard-section" class="section hidden">
+      <header class="header">
+        <div class="header-left">
+          <h1>Schul Dashboard</h1>
+        </div>
+        <div class="header-right">
+          <div class="location-selector">
+            <label for="location-select">Standort:</label>
+            <select id="location-select"></select>
+          </div>
+          <div class="user-info">
+            <span id="user-email"></span>
+            <span id="user-role"></span>
+          </div>
+          <button id="logout-btn" class="btn btn-outline">Abmelden</button>
+        </div>
+      </header>
+
+      <div class="dashboard-container">
+        <nav class="sidebar">
+          <ul class="nav-menu">
+            <li class="nav-item" data-page="home">
+              <i class="material-icons">dashboard</i>
+              <span>Dashboard</span>
+            </li>
+            <li class="nav-item developer-lead" data-page="users">
+              <i class="material-icons">people</i>
+              <span>Mitarbeiter</span>
+            </li>
+            <li class="nav-item developer-lead" data-page="emails">
+              <i class="material-icons">email</i>
+              <span>E-Mails</span>
+            </li>
+            <li class="nav-item developer-lead" data-page="buttons">
+              <i class="material-icons">add_circle</i>
+              <span>Buttons</span>
+            </li>
+            <li class="nav-item developer" data-page="admin">
+              <i class="material-icons">admin_panel_settings</i>
+              <span>Admin</span>
+            </li>
+            <li class="nav-item" data-page="settings">
+              <i class="material-icons">settings</i>
+              <span>Einstellungen</span>
+            </li>
+          </ul>
+        </nav>
+
+        <main class="content">
+          <!-- Seiteninhalte werden dynamisch geladen -->
+          <div id="page-container"></div>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/pages/home.js"></script>
+  <script src="js/pages/users.js"></script>
+  <script src="js/pages/emails.js"></script>
+  <script src="js/pages/buttons.js"></script>
+  <script src="js/pages/admin.js"></script>
+  <script src="js/pages/settings.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
