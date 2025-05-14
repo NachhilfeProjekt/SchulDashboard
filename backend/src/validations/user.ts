@@ -7,7 +7,7 @@ export const createUserSchema = Joi.object({
     'string.email': 'Bitte geben Sie eine gültige E-Mail-Adresse ein',
     'any.required': 'E-Mail ist erforderlich'
   }),
-  role: Joi.string().valid(...Object.values(UserRole)).required().messages({
+  role: Joi.string().valid('developer', 'lead', 'office', 'teacher').required().messages({
     'any.only': 'Rolle muss einer der folgenden Werte sein: developer, lead, office, teacher',
     'any.required': 'Rolle ist erforderlich'
   }),
@@ -34,11 +34,9 @@ export const passwordResetSchema = Joi.object({
   }),
   newPassword: Joi.string()
     .min(8)
-    .pattern(new RegExp('^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})'))
     .required()
     .messages({
       'string.min': 'Passwort muss mindestens 8 Zeichen lang sein',
-      'string.pattern.base': 'Passwort muss mindestens einen Großbuchstaben, einen Kleinbuchstaben, eine Zahl und ein Sonderzeichen enthalten',
       'any.required': 'Neues Passwort ist erforderlich'
     })
 });
