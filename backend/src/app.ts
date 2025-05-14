@@ -11,12 +11,16 @@ import buttonRoutes from './routes/buttonRoutes';
 import emailRoutes from './routes/emailRoutes';
 import { notFound, errorHandler } from './middleware/errorMiddleware';
 import logger from './config/logger';
+import debugRoutes from './routes/debugRoute';
 import { initializeDatabase } from './scripts/initDatabase';
 
 // Lade Umgebungsvariablen
 dotenv.config();
 
 const app = express();
+
+// Debug-Routes (nur zur Fehlerbehebung, später entfernen)
+app.use('/debug', debugRoutes);
 
 // Einfache CORS-Konfiguration für alle Origins
 app.use(cors({
