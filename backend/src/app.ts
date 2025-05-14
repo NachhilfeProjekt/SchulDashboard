@@ -24,7 +24,10 @@ app.use('/debug', debugRoutes);
 
 // Einfache CORS-Konfiguration für alle Origins
 app.use(cors({
-  origin: '*',
+  origin: [
+    'https://dashboard-frontend-p693.onrender.com',
+    process.env.NODE_ENV === 'development' ? 'http://localhost:5173' : null
+  ].filter(Boolean),
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
