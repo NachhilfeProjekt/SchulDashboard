@@ -9,8 +9,16 @@ const JWT_SECRET = process.env.JWT_SECRET || 'default-secret';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1d';
 
 export const generateToken = (userId: string, role: UserRole, locations: string[]): string => {
+  const payload = {
+    userId,
+    role,
+    locations
+  };
+  
+  console.log(`Generiere Token mit Payload:`, payload);
+  
   return jwt.sign(
-    { userId, role, locations },
+    payload,
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN }
   );
