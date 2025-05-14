@@ -22,12 +22,9 @@ const app = express();
 // Debug-Routes (nur zur Fehlerbehebung, später entfernen)
 app.use('/debug', debugRoutes);
 
-// Einfache CORS-Konfiguration für alle Origins
+// CORS-Konfiguration mit mehr Details
 app.use(cors({
-  origin: [
-    'https://dashboard-frontend-p693.onrender.com',
-    process.env.NODE_ENV === 'development' ? 'http://localhost:5173' : null
-  ].filter(Boolean),
+  origin: '*', // In Produktion sollten Sie spezifische Domains angeben
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -51,65 +48,4 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API-Routen
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/locations', locationRoutes);
-app.use('/api/buttons', buttonRoutes);
-app.use('/api/emails', emailRoutes);
-
-// Alternative Routen ohne /api Präfix für maximale Kompatibilität
-app.use('/auth', authRoutes);
-app.use('/users', userRoutes);
-app.use('/locations', locationRoutes);
-app.use('/buttons', buttonRoutes);
-app.use('/emails', emailRoutes);
-
-// Fehlerbehandlung
-app.use(notFound);
-app.use(errorHandler);
-
-const PORT = process.env.PORT || 10000;
-
-// Server starten, wenn dies das Hauptmodul ist
-if (require.main === module) {
-  // Initialisiere die Datenbank, bevor der Server startet
-  initializeDatabase()
-    .then(success => {
-      if (success) {
-        logger.info('Datenbank erfolgreich initialisiert.');
-      } else {
-        logger.warn('Fehler bei der Datenbank-Initialisierung. Der Server wird trotzdem gestartet.');
-      }
-      app.get('/init-database', async (req: express.Request, res: express.Response) => {
-  try {
-    const success = await initializeDatabase();
-    if (success) {
-      res.status(200).json({ 
-        status: 'OK',
-        message: 'Datenbank erfolgreich initialisiert'
-      });
-    } else {
-      res.status(500).json({ 
-        status: 'ERROR',
-        message: 'Fehler bei der Datenbankinitialisierung'
-      });
-    }
-  } catch (error) {
-    res.status(500).json({ 
-      status: 'ERROR',
-      message: `Unerwarteter Fehler: ${error.message}`
-    });
-  }
-});
-      // Starte den Server
-      app.listen(PORT, () => {
-        logger.info(`Server running on port ${PORT}`);
-      });
-    })
-    .catch(err => {
-      logger.error(`Fehler beim Starten des Servers: ${err}`);
-    });
-}
-
-export default app;
+//
