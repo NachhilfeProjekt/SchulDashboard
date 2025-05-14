@@ -17,18 +17,45 @@ const DashboardPage: React.FC = () => {
     }
   }, [user, currentLocation]);
 
-  const fetchCustomButtons = async () => {
-    if (!currentLocation) return;
+  // In frontend/src/pages/DashboardPage.tsx aktualisiere die fetchCustomButtons-Funktion
+const fetchCustomButtons = async () => {
+  if (!currentLocation) return;
+  
+  setLoading(true);
+  try {
+    console.log(`Versuche Buttons für Standort ${currentLocation.id} abzurufen`);
+    const buttons = await getButtonsForUser(currentLocation.id);
+    console.log(`Erhaltene Buttons:`, buttons);
+    setCustomButtons(buttons);
     
-    setLoading(true);
-    try {
-      const buttons = await getButtonsForUser(currentLocation.id);
-      setCustomButtons(buttons);
-    } catch (error) {
-      console.error('Error fetching custom buttons:', error);
-    } finally {
-      setLoading(false);
+    // Wenn keine Buttons zurückgegeben wurden, erzeuge einen lokalen Test-Button
+    if (buttons.length === 0) {
+      console.log('Keine Buttons erhalten, erstelle lokalen Test-Button');
+      setCustomButtons([{
+        id: 'local-fallback',
+        name: 'Test Button (Fallback)',
+        url: 'https://example.com',
+        locationId: currentLocation.id,
+        created_by: 'system',
+        created_at: new Date().toISOString()
+      }]);
     }
+  } catch (error) {
+    console.error('Error fetching custom buttons:', error);
+    
+    // Im Fehlerfall einen lokalen Test-Button anzeigen
+    setCustomButtons([{
+      id: 'error-fallback',
+      name: 'Test Button (Fehler-Fallback)',
+      url: 'https://example.com',
+      locationId: currentLocation?.id || 'default',
+      created_by: 'system',
+      created_at: new Date().toISOString()
+    }]);
+  } finally {
+    setLoading(false);
+  }
+};
   };
 
   if (!user || !currentLocation) return null;
