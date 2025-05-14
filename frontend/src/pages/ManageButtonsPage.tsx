@@ -424,3 +424,47 @@ const ManageButtonsPage: React.FC = () => {
             )}
           </List>
         </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPermissionsDialog(false)} disabled={loading}>
+            Abbrechen
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={handleSavePermissions}
+            disabled={loading}
+          >
+            Speichern
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Bestätigungsdialog für Löschen */}
+      <Dialog open={confirmDeleteDialog} onClose={() => setConfirmDeleteDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Button löschen</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Möchten Sie den Button "{buttonToDelete?.name}" wirklich löschen?
+          </Typography>
+          <Typography variant="body2" color="error" sx={{ mt: 2 }}>
+            Diese Aktion kann nicht rückgängig gemacht werden.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDeleteDialog(false)} disabled={loading}>
+            Abbrechen
+          </Button>
+          <Button 
+            variant="contained" 
+            color="error"
+            onClick={handleDeleteButton}
+            disabled={loading}
+          >
+            Löschen
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default ManageButtonsPage;
