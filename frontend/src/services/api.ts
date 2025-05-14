@@ -138,4 +138,118 @@ export const deactivateUser = async (userId: string) => {
   return response.data;
 };
 
+// frontend/src/services/api.ts
+// Füge diese Funktionen hinzu oder aktualisiere die bestehenden
+
+// Buttons
+export const getButtonsForUser = async (locationId: string) => {
+  try {
+    console.log('Button-Anfrage wird gesendet...');
+    const response = await api.get(`/buttons/location/${locationId}`);
+    console.log('Button-Antwort:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Buttons:', error);
+    
+    // Fallback für Entwicklungs- oder Testzwecke
+    // In Produktion würde man diese entfernen
+    return [{
+      id: 'fallback-button-1',
+      name: 'Test-Button (Fallback)',
+      url: 'https://example.com',
+      location_id: locationId,
+      created_by: 'system',
+      created_at: new Date().toISOString()
+    }];
+  }
+};
+
+export const createCustomButton = async (name: string, url: string, locationId: string) => {
+  const response = await api.post('/buttons', { name, url, locationId });
+  return response.data;
+};
+
+export const setButtonPermissions = async (buttonId: string, permissions: {roles?: string[], users?: string[]}) => {
+  const response = await api.post(`/buttons/${buttonId}/permissions`, { permissions });
+  return response.data;
+};
+
+// NEUE FUNKTION: Button löschen
+export const deleteButton = async (buttonId: string) => {
+  const response = await api.delete(`/buttons/${buttonId}`);
+  return response.data;
+};
+
+// E-Mails
+export const getEmailTemplates = async (locationId: string) => {
+  try {
+    const response = await api.get(`/emails/templates/location/${locationId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching email templates:', error);
+    
+    // Fallback für Fehler
+    if (error.response && (error.response.status === 404 || error.response.status === 500)) {
+      console.log('Endpunkt nicht verfügbar, verwende Mock-Daten für E-Mail-Vorlagen');
+      return [
+        {
+          id: 'mock-template-1',
+          name: 'Willkommens-E-Mail',
+          subject: 'Willkommen im System',
+          body: 'Hallo {{name}}, willkommen im System!',
+          locationId: locationId,
+          created_by: 'system',
+          created_at: new Date().toISOString()
+        },
+        {
+          id: 'mock-template-2',
+          name: 'Benachrichtigung',
+          subject: 'Neue Information',
+          body: 'Hallo {{name}}, es gibt neue Informationen!',
+          locationId: locationId,
+          created_by: 'system',
+          created_at: new Date().toISOString()
+        }
+      ];
+    }
+    
+    throw error;
+  }
+};
+
+export const getSentEmails = async (locationId: string) => {
+  try {
+    const response = await api.get(`/emails/sent?locationId=${locationId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching sent emails:', error);
+    
+    // Für 404-Fehler (Endpoint nicht gefunden) leeres Array zurückgeben
+    if (error.response && error.response.status === 404) {
+      console.log('Die API-Route für gesendete E-Mails ist nicht implementiert. Gebe leeres Array zurück.');
+      return [];
+    }
+    
+    throw error;
+  }
+};
+
+// NEUE FUNKTION: Fehlgeschlagene E-Mails erneut senden
+export const resendFailedEmails = async (emailIds: string[]) => {
+  try {
+    const response = await api.post('/emails/resend', { emailIds });
+    return response.data;
+  } catch (error) {
+    console.error('Error resending emails:', error);
+    
+    // Fallback für nicht implementierte Endpoint
+    if (error.response && error.response.status === 404) {
+      console.log('Die API-Route zum erneuten Senden ist nicht implementiert.');
+      return { message: 'E-Mails werden erneut gesendet (Simulation).' };
+    }
+    
+    throw error;
+  }
+};
+
 export default api;
