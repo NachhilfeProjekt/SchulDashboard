@@ -252,4 +252,77 @@ export const resendFailedEmails = async (emailIds: string[]) => {
   }
 };
 
+// frontend/src/services/api.ts
+import axios, { AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
+
+// Konstante für den Token-Schlüssel
+export const TOKEN_KEY = 'schul_dashboard_token';
+
+// API-URL aus .env oder fallback
+const API_URL = import.meta.env.VITE_API_URL || 'https://dashboard-backend-uweg.onrender.com/api';
+
+// Initialisiere Axios mit Basiskonfiguration
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  timeout: 15000, // 15 Sekunden Timeout für alle Anfragen
+});
+
+// Request Interceptor für das Hinzufügen des Tokens
+api.interceptors.request.use((config: AxiosRequestConfig) => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  
+  console.log('Token für API-Anfrage:', token ? 'Vorhanden' : 'Nicht vorhanden');
+  
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  
+  return config;
+});
+
+// Response Interceptor für bessere Fehlerbehandlung
+api.interceptors.response.use(
+  (response: AxiosResponse) => response,
+  (error: AxiosError) => {
+    // Verbesserte Fehlerbehandlung
+    if (error.response) {
+      // Der Server hat geantwortet mit einem Statuscode außerhalb des 2xx-Bereichs
+      console.error('API Error Response:', {
+        status: error.response.status,
+        data: error.response.data,
+        headers: error.response.headers,
+        url: error.config?.url
+      });
+      
+      // 401-Fehler (Unauthorized) -> automatisches Logout
+      if (error.response.status === 401) {
+        console.log('401 Unauthorized - Auto-Logout');
+        // Optional: Automatischer Logout
+        // localStorage.removeItem(TOKEN_KEY);
+        // window.location.href = '/login';
+      }
+    } else if (error.request) {
+      // Die Anfrage wurde gestellt, aber keine Antwort erhalten
+      console.error('API Error Request:', {
+        request: error.request,
+        url: error.config?.url
+      });
+    } else {
+      // Beim Einrichten der Anfrage ist ein Fehler aufgetreten
+      console.error('API Error Setup:', error.message);
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
+// Exportiere Basis-API
+export default api;
+
+// Exportiere API-Funktionen...
+
 export default api;
