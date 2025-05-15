@@ -1,4 +1,4 @@
-// frontend/src/pages/LoginPage.jsx
+// frontend/src/pages/LoginPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { 
@@ -10,7 +10,7 @@ import WifiOffIcon from '@mui/icons-material/WifiOff';
 import axios from 'axios';
 import { loginSuccess } from '../store/authSlice';
 
-const LoginPage = () => {
+const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('admin@example.com');
   const [password, setPassword] = useState('admin123');
   const [loading, setLoading] = useState(false);
@@ -60,7 +60,7 @@ const LoginPage = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -97,9 +97,9 @@ const LoginPage = () => {
     } catch (error) {
       console.error('Login-Fehler:', error);
       
-      if (error.response) {
+      if (axios.isAxiosError(error) && error.response) {
         setError(error.response.data.message || 'Anmeldung fehlgeschlagen.');
-      } else if (error.request) {
+      } else if (axios.isAxiosError(error) && error.request) {
         setError('Keine Antwort vom Server. Überprüfen Sie Ihre Internetverbindung.');
         setOfflineMode(true);
       } else {
