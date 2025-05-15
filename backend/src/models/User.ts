@@ -453,6 +453,41 @@ export const sendBulkEmails = async (
     client.release();
   }
 };
+// backend/src/models/User.ts - Ergänzen Sie diese Funktion
+
+// Benutzer deaktivieren
+export const deactivateUser = async (userId: string, deactivatedBy: string): Promise<boolean> => {
+  try {
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Update the user's is_active status
+      const updateResult = await client.query(
+        'UPDATE users SET is_active = false, deactivated_by = $1, deactivated_at = NOW() WHERE id = $2 RETURNING id',
+        [deactivatedBy, userId]
+      );
+      
+      if (updateResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return false;
+      }
+      
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error(`Fehler beim Deaktivieren des Benutzers: ${error}`);
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    logger.error(`Fehler beim Deaktivieren des Benutzers: ${error}`);
+    throw error;
+  }
+};
 
 export const UserModel = {
   createUser,
