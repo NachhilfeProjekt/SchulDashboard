@@ -554,6 +554,145 @@ export const deactivateUser = async (userId: string, deactivatedBy: string): Pro
   }
 };
 
+// Benutzer reaktivieren
+export const reactivateUser = async (userId: string, reactivatedBy: string): Promise<boolean> => {
+  try {
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Überprüfen, ob der Benutzer deaktiviert ist
+      const checkResult = await client.query(
+        'SELECT * FROM users WHERE id = $1 AND is_active = false',
+        [userId]
+      );
+      
+      if (checkResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return false; // Benutzer existiert nicht oder ist bereits aktiv
+      }
+      
+      // Update the user's is_active status
+      const updateResult = await client.query(
+        'UPDATE users SET is_active = true, deactivated_by = NULL, deactivated_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING id',
+        [userId]
+      );
+      
+      if (updateResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return false;
+      }
+      
+      // Log reactivation event
+      await client.query(
+        'INSERT INTO user_activity_log (user_id, action, performed_by, performed_at) VALUES ($1, $2, $3, NOW())',
+        [userId, 'reactivated', reactivatedBy]
+      );
+      
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error(`Fehler beim Reaktivieren des Benutzers: ${error}`);
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    logger.error(`Fehler beim Reaktivieren des Benutzers: ${error}`);
+    throw error;
+  }
+};
+
+// Benutzer permanent löschen
+export const deleteUser = async (userId: string): Promise<boolean> => {
+  try {
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Überprüfen, ob Benutzer existiert
+      const userCheck = await client.query(
+        'SELECT * FROM users WHERE id = $1',
+        [userId]
+      );
+      
+      if (userCheck.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return false;
+      }
+      
+      // Entferne Benutzer aus allen Standorten
+      await client.query(
+        'DELETE FROM user_locations WHERE user_id = $1',
+        [userId]
+      );
+      
+      // Entferne Button-Berechtigungen für den Benutzer
+      await client.query(
+        'DELETE FROM button_permissions WHERE user_id = $1',
+        [userId]
+      );
+      
+      // Lösche den Benutzer
+      const deleteResult = await client.query(
+        'DELETE FROM users WHERE id = $1 RETURNING id',
+        [userId]
+      );
+      
+      if (deleteResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return false;
+      }
+      
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error(`Fehler beim permanenten Löschen des Benutzers: ${error}`);
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    logger.error(`Fehler beim permanenten Löschen des Benutzers: ${error}`);
+    throw error;
+  }
+};
+
+// Deaktivierte Benutzer abrufen
+export const getDeactivatedUsers = async (): Promise<User[]> => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE is_active = false ORDER BY email'
+    );
+    return result.rows;
+  } catch (error) {
+    logger.error(`Fehler beim Abrufen deaktivierter Benutzer: ${error}`);
+    throw error;
+  }
+};
+
+// Benutzeraktivitätsprotokoll abrufen
+export const getUserActivityLog = async (userId: string): Promise<any[]> => {
+  try {
+    const result = await pool.query(
+      `SELECT ual.*, 
+              u.email as performed_by_email 
+       FROM user_activity_log ual
+       LEFT JOIN users u ON ual.performed_by = u.id
+       WHERE ual.user_id = $1
+       ORDER BY ual.performed_at DESC`,
+      [userId]
+    );
+    return result.rows;
+  } catch (error) {
+    logger.error(`Fehler beim Abrufen des Benutzeraktivitätsprotokolls: ${error}`);
+    throw error;
+  }
+};
 export const UserModel = {
   createUser,
   getUserByEmail,
