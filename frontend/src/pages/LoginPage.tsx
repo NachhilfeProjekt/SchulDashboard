@@ -1,6 +1,7 @@
 // frontend/src/pages/LoginPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { 
   Box, Button, Container, TextField, Typography, Paper, Avatar, 
   Alert, CircularProgress, Snackbar
@@ -21,6 +22,24 @@ const LoginPage: React.FC = () => {
   const [debugMode, setDebugMode] = useState(false);
   
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  // Bei Seitenladung prüfen, ob der Benutzer bereits angemeldet ist
+  useEffect(() => {
+    const token = localStorage.getItem('schul_dashboard_token');
+    const user = JSON.parse(localStorage.getItem('schul_dashboard_user') || 'null');
+    const locations = JSON.parse(localStorage.getItem('schul_dashboard_locations') || '[]');
+    const currentLocation = JSON.parse(localStorage.getItem('schul_dashboard_current_location') || 'null');
+    
+    if (token && user && locations.length > 0 && currentLocation) {
+      dispatch(loginSuccess({
+        token,
+        user,
+        locations
+      }));
+      navigate('/dashboard');
+    }
+  }, [dispatch, navigate]);
 
   // Debug-Funktionalität
   const toggleDebugMode = () => {
@@ -93,7 +112,7 @@ const LoginPage: React.FC = () => {
       }));
       
       // Weiterleitung zum Dashboard
-      window.location.href = '/dashboard';
+      navigate('/dashboard');
     } catch (error) {
       console.error('Login-Fehler:', error);
       
@@ -151,9 +170,7 @@ const LoginPage: React.FC = () => {
       setNotification('Offline-Modus aktiviert. Eingeschränkte Funktionalität verfügbar.');
       
       // Weiterleitung zum Dashboard
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 1000);
+      navigate('/dashboard');
     } catch (error) {
       console.error('Fehler beim Aktivieren des Offline-Modus:', error);
       setError('Fehler beim Aktivieren des Offline-Modus.');
