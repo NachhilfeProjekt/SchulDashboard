@@ -489,6 +489,73 @@ export const deactivateUser = async (userId: string, deactivatedBy: string): Pro
   }
 };
 
+// backend/src/models/User.ts - Ergänzen Sie diese Funktionen
+
+// Get location by ID
+export const getLocationById = async (locationId: string): Promise<Location | null> => {
+  try {
+    const result = await pool.query('SELECT * FROM locations WHERE id = $1', [locationId]);
+    return result.rows[0] || null;
+  } catch (error) {
+    logger.error(`Fehler beim Abrufen des Standorts nach ID: ${error}`);
+    throw error;
+  }
+};
+
+// Delete location
+export const deleteLocation = async (locationId: string): Promise<boolean> => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    // First check if the location is used by any users
+    const userCheck = await client.query(
+      'SELECT COUNT(*) FROM user_locations WHERE location_id = $1',
+      [locationId]
+    );
+    
+    if (parseInt(userCheck.rows[0].count) > 0) {
+      throw new Error('Location is still associated with users');
+    }
+    
+    // Check if the location has buttons
+    const buttonCheck = await client.query(
+      'SELECT COUNT(*) FROM custom_buttons WHERE location_id = $1',
+      [locationId]
+    );
+    
+    if (parseInt(buttonCheck.rows[0].count) > 0) {
+      throw new Error('Location is still associated with buttons');
+    }
+    
+    // Check if the location has email templates
+    const emailCheck = await client.query(
+      'SELECT COUNT(*) FROM email_templates WHERE location_id = $1',
+      [locationId]
+    );
+    
+    if (parseInt(emailCheck.rows[0].count) > 0) {
+      throw new Error('Location is still associated with email templates');
+    }
+    
+    // If we get here, we can safely delete the location
+    const result = await client.query(
+      'DELETE FROM locations WHERE id = $1 RETURNING id',
+      [locationId]
+    );
+    
+    await client.query('COMMIT');
+    
+    return result.rows.length > 0;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    logger.error(`Fehler beim Löschen des Standorts: ${error}`);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
 export const UserModel = {
   createUser,
   getUserByEmail,
