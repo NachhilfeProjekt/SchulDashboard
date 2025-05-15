@@ -1,63 +1,65 @@
 // frontend/src/App.tsx
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Provider } from 'react-redux';
-import store from './store/store';
-import Layout from './components/Layout';
+import { store } from './store/store';
 import LoginPage from './pages/LoginPage';
+import Layout from './components/Layout';
 import DashboardPage from './pages/DashboardPage';
-import EmailPage from './pages/EmailPage';
-import ManageUsersPage from './pages/ManageUsersPage';
-import ManageButtonsPage from './pages/ManageButtonsPage';
-import SettingsPage from './pages/SettingsPage';
-import AdminPage from './pages/AdminPage';
-import CreateLeadPage from './pages/CreateLeadPage';
-import ResetPasswordPage from './pages/ResetPasswordPage';
-import UserManagementPage from './pages/UserManagementPage'; // Neuer Import
+import UsersPage from './pages/UsersPage';
+import ProfilePage from './pages/ProfilePage';
+import NotFoundPage from './pages/NotFoundPage';
+import './App.css';
 
-// Einfache Authentifizierungsprüfung
-const isAuthenticated = () => {
-  return localStorage.getItem('schul_dashboard_token') !== null;
-};
+// Direkt und explizit importieren - dies ist der kritische Teil
+import LocationManagementPage from './pages/LocationManagementPage';
 
-// Einfache Private Route Komponente
-const PrivateRoute = ({ element }) => {
-  return isAuthenticated() ? element : <Navigate to="/login" replace />;
-};
+const router = createBrowserRouter([
+  {
+    path: '/login',
+    element: <LoginPage />,
+  },
+  {
+    path: '/',
+    element: <Layout />,
+    children: [
+      {
+        path: '/',
+        element: <DashboardPage />,
+      },
+      {
+        path: 'dashboard',
+        element: <DashboardPage />,
+      },
+      {
+        path: 'locations',
+        // Stellen Sie sicher, dass die Komponente direkt verwendet wird, nicht als String oder Variable
+        element: <LocationManagementPage />,
+      },
+      {
+        path: 'users',
+        element: <UsersPage />,
+      },
+      {
+        path: 'profile',
+        element: <ProfilePage />,
+      },
+      {
+        path: '*',
+        element: <NotFoundPage />,
+      },
+    ],
+  },
+]);
 
-const App = () => {
-  return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        
-        <Route path="/" element={<PrivateRoute element={<Layout />} />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="email" element={<EmailPage />} />
-          <Route path="manage-users" element={<ManageUsersPage />} />
-          <Route path="manage-buttons" element={<ManageButtonsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="admin" element={<AdminPage />} />
-          <Route path="create-lead" element={<CreateLeadPage />} />
-          <Route path="user-management" element={<UserManagementPage />} /> {/* Neue Route */}
-         <Route path="location-management" element={<LocationManagementPage />} />
-         <Route path="accept-invitation" element={<AcceptInvitationPage />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Route>
-      </Routes>
-    </Router>
-  );
-};
-
-// Hauptkomponente mit Redux Provider
-const AppWithRedux = () => {
+function App() {
   return (
     <Provider store={store}>
-      <App />
+      <div className="app">
+        <RouterProvider router={router} />
+      </div>
     </Provider>
   );
-};
+}
 
-export default AppWithRedux;
+export default App;
