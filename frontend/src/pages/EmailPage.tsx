@@ -1,7 +1,8 @@
+// frontend/src/pages/EmailPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
-import { getEmailTemplates, sendBulkEmails, getSentEmails } from '../services/api';
+import { getEmailTemplates, sendBulkEmails, getSentEmails, resendFailedEmails } from '../services/api';
 import {
   Box,
   Button,
@@ -22,7 +23,9 @@ import {
   IconButton,
   Chip,
   Tab,
-  Tabs
+  Tabs,
+  Alert,
+  CircularProgress
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SendIcon from '@mui/icons-material/Send';
@@ -65,17 +68,33 @@ const EmailPage: React.FC = () => {
   const [sentEmails, setSentEmails] = useState<SentEmail[]>([]);
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
       if (currentLocation) {
         setLoading(true);
         try {
-          const fetchedTemplates = await getEmailTemplates(currentLocation.id);
-          setTemplates(fetchedTemplates);
+          // Templates abrufen
+          try {
+            const fetchedTemplates = await getEmailTemplates(currentLocation.id);
+            setTemplates(fetchedTemplates);
+          } catch (templateError) {
+            console.error('Error fetching email templates:', templateError);
+            // Silent failure - zeigt einfach eine leere Liste an
+            setTemplates([]);
+          }
           
-          const fetchedSentEmails = await getSentEmails(currentLocation.id);
-          setSentEmails(fetchedSentEmails);
+          // Gesendete E-Mails abrufen
+          try {
+            const fetchedSentEmails = await getSentEmails(currentLocation.id);
+            setSentEmails(fetchedSentEmails);
+          } catch (emailsError) {
+            console.error('Error fetching sent emails:', emailsError);
+            // Silent failure - zeigt einfach eine leere Liste an
+            setSentEmails([]);
+          }
         } catch (error) {
           console.error('Error fetching email data:', error);
         } finally {
@@ -83,6 +102,7 @@ const EmailPage: React.FC = () => {
         }
       }
     };
+    
     fetchData();
   }, [currentLocation]);
 
@@ -99,32 +119,33 @@ const EmailPage: React.FC = () => {
     setRecipients(newRecipients);
   };
 
-  // In EmailPage.tsx, ändere die handleSendEmails-Funktion wie folgt:
-
-const handleSendEmails = async () => {
-  if (!selectedTemplate || recipients.length === 0) return;
-  
-  setLoading(true);
-  try {
-    await sendBulkEmails(selectedTemplate, recipients);
-    setRecipients([]);
-    setSelectedTemplate('');
+  const handleSendEmails = async () => {
+    if (!selectedTemplate || recipients.length === 0 || !currentLocation) return;
     
-    // Refresh sent emails list
-    const fetchedSentEmails = await getSentEmails(currentLocation?.id || '');
-    setSentEmails(fetchedSentEmails);
+    setLoading(true);
+    setError('');
+    setSuccess('');
     
-    // Switch to sent emails tab
-    setTabValue(1);
-  } catch (error) {
-    console.error('Fehler beim Senden der E-Mails:', error);
-    alert('Fehler beim Senden der E-Mails. Bitte versuchen Sie es später erneut.');
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      await sendBulkEmails(selectedTemplate, recipients);
+      setRecipients([]);
+      setSelectedTemplate('');
       
-
+      setSuccess('E-Mails werden versendet.');
+      
+      // Refresh sent emails list
+      const fetchedSentEmails = await getSentEmails(currentLocation.id);
+      setSentEmails(fetchedSentEmails);
+      
+      // Switch to sent emails tab
+      setTabValue(1);
+    } catch (error) {
+      console.error('Fehler beim Senden der E-Mails:', error);
+      setError('Fehler beim Senden der E-Mails. Bitte versuchen Sie es später erneut.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -144,7 +165,35 @@ const handleSendEmails = async () => {
     }
   };
 
-  if (!user || !currentLocation) return null;
+  // Füge diese Funktion für das erneute Senden fehlgeschlagener E-Mails hinzu
+  const handleResendEmails = async (emailIds: string[]) => {
+    if (!emailIds.length || !currentLocation) return;
+    
+    setLoading(true);
+    try {
+      await resendFailedEmails(emailIds);
+      
+      // Aktualisiere die Liste der gesendeten E-Mails
+      const fetchedSentEmails = await getSentEmails(currentLocation.id);
+      setSentEmails(fetchedSentEmails);
+      
+      setSuccess('E-Mails werden erneut gesendet.');
+    } catch (error) {
+      console.error('Fehler beim erneuten Senden der E-Mails:', error);
+      setError('Fehler beim erneuten Senden der E-Mails. Bitte versuchen Sie es später erneut.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!user || !currentLocation) {
+    return (
+      <Box sx={{ padding: 2 }}>
+        <Typography variant="h5">Laden...</Typography>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   if (user.role !== 'developer' && user.role !== 'lead') {
     return (
@@ -158,6 +207,18 @@ const handleSendEmails = async () => {
   return (
     <Box sx={{ padding: 2 }}>
       <Typography variant="h4" gutterBottom>E-Mail-Versand</Typography>
+      
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {success}
+        </Alert>
+      )}
       
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="email tabs">
@@ -310,63 +371,6 @@ const handleSendEmails = async () => {
       </TabPanel>
     </Box>
   );
-};
-// Füge diese verbesserte Fehlerbehandlung zur EmailPage.tsx hinzu
-
-useEffect(() => {
-  const fetchData = async () => {
-    if (currentLocation) {
-      setLoading(true);
-      try {
-        // Templates abrufen
-        try {
-          const fetchedTemplates = await getEmailTemplates(currentLocation.id);
-          setTemplates(fetchedTemplates);
-        } catch (templateError) {
-          console.error('Error fetching email templates:', templateError);
-          // Silent failure - zeigt einfach eine leere Liste an
-          setTemplates([]);
-        }
-        
-        // Gesendete E-Mails abrufen
-        try {
-          const fetchedSentEmails = await getSentEmails(currentLocation.id);
-          setSentEmails(fetchedSentEmails);
-        } catch (emailsError) {
-          console.error('Error fetching sent emails:', emailsError);
-          // Silent failure - zeigt einfach eine leere Liste an
-          setSentEmails([]);
-        }
-      } catch (error) {
-        console.error('Error fetching email data:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-  
-  fetchData();
-}, [currentLocation]);
-
-// Füge diese Funktion für das erneute Senden fehlgeschlagener E-Mails hinzu
-const handleResendEmails = async (emailIds: string[]) => {
-  if (!emailIds.length) return;
-  
-  setLoading(true);
-  try {
-    await resendFailedEmails(emailIds);
-    
-    // Aktualisiere die Liste der gesendeten E-Mails
-    const fetchedSentEmails = await getSentEmails(currentLocation?.id || '');
-    setSentEmails(fetchedSentEmails);
-    
-    setSuccess('E-Mails werden erneut gesendet.');
-  } catch (error) {
-    console.error('Fehler beim erneuten Senden der E-Mails:', error);
-    setError('Fehler beim erneuten Senden der E-Mails. Bitte versuchen Sie es später erneut.');
-  } finally {
-    setLoading(false);
-  }
 };
 
 export default EmailPage;
