@@ -54,6 +54,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/buttons', buttonRoutes);
 app.use('/api/emails', emailRoutes);
+app.use('/api/locations', locationRoutes);
 
 // Alternative Routen ohne /api Präfix für maximale Kompatibilität
 app.use('/auth', authRoutes);
@@ -61,6 +62,7 @@ app.use('/users', userRoutes);
 app.use('/locations', locationRoutes);
 app.use('/buttons', buttonRoutes);
 app.use('/emails', emailRoutes);
+app.use('/locations', locationRoutes);
 
 // Datenbank-Initialisierungsroute - explizit außerhalb der initializeDatabase-Funktion
 app.get('/init-database', async (req: express.Request, res: express.Response) => {
