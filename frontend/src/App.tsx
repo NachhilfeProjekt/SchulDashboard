@@ -6,13 +6,9 @@ import { store } from './store/store';
 import LoginPage from './pages/LoginPage';
 import Layout from './components/Layout';
 import DashboardPage from './pages/DashboardPage';
-import UsersPage from './pages/UsersPage';
-import ProfilePage from './pages/ProfilePage';
+import LocationManagementPage from './pages/LocationManagementPage';
 import NotFoundPage from './pages/NotFoundPage';
 import './App.css';
-
-// Direkt und explizit importieren - dies ist der kritische Teil
-import LocationManagementPage from './pages/LocationManagementPage';
 
 const router = createBrowserRouter([
   {
@@ -33,16 +29,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'locations',
-        // Stellen Sie sicher, dass die Komponente direkt verwendet wird, nicht als String oder Variable
         element: <LocationManagementPage />,
-      },
-      {
-        path: 'users',
-        element: <UsersPage />,
-      },
-      {
-        path: 'profile',
-        element: <ProfilePage />,
       },
       {
         path: '*',
