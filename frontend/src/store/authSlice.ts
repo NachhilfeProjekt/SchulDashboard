@@ -31,14 +31,21 @@ const authSlice = createSlice({
     },
     updateUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
+      // Speichere den aktualisierten Benutzer im localStorage
+      localStorage.setItem('schul_dashboard_user', JSON.stringify(action.payload));
     },
     setCurrentLocation: (state, action: PayloadAction<Location>) => {
       state.currentLocation = action.payload;
-      localStorage.setItem('currentLocation', JSON.stringify(action.payload));
+      // Speichere den aktuellen Standort im localStorage
+      localStorage.setItem('schul_dashboard_current_location', JSON.stringify(action.payload));
     },
     updateUserLocations: (state, action: PayloadAction<Location[]>) => {
       if (state.user) {
         state.user.locations = action.payload;
+        // Aktualisiere den Benutzer im localStorage mit den neuen Standorten
+        localStorage.setItem('schul_dashboard_user', JSON.stringify(state.user));
+        // Speichere die Standorte separat im localStorage
+        localStorage.setItem('schul_dashboard_locations', JSON.stringify(action.payload));
       }
     },
     logout: (state) => {
@@ -46,8 +53,12 @@ const authSlice = createSlice({
       state.token = null;
       state.isAuthenticated = false;
       state.currentLocation = null;
+      // Entferne alle relevanten Einträge aus dem localStorage
       localStorage.removeItem('token');
-      localStorage.removeItem('currentLocation');
+      localStorage.removeItem('schul_dashboard_token');
+      localStorage.removeItem('schul_dashboard_user');
+      localStorage.removeItem('schul_dashboard_locations');
+      localStorage.removeItem('schul_dashboard_current_location');
     },
   },
 });
