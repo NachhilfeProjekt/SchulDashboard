@@ -63,6 +63,10 @@ const authSlice = createSlice({
       state.currentLocation = action.payload;
       localStorage.setItem('schul_dashboard_current_location', JSON.stringify(action.payload));
     },
+    updateUserLocations: (state, action: PayloadAction<Location[]>) => {
+    state.locations = action.payload;
+    localStorage.setItem('schul_dashboard_locations', JSON.stringify(action.payload));
+    },
     updateUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
       localStorage.setItem('schul_dashboard_user', JSON.stringify(action.payload));
