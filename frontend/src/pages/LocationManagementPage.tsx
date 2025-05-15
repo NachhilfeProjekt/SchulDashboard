@@ -11,13 +11,13 @@ import {
   Tabs, Tab, Divider, Alert, SelectChangeEvent
 } from '@mui/material';
 import AddLocationIcon from '@mui/icons-material/AddLocation';
-import { Location } from '../types';
 
+// Stellen Sie sicher, dass Sie einen expliziten Namen für die Komponente verwenden
 const LocationManagementPage: React.FC = () => {
   const { user, currentLocation } = useSelector((state: RootState) => state.auth);
   const dispatch = useDispatch<AppDispatch>();
-  const [userLocations, setUserLocations] = useState<Location[]>([]);
-  const [availableLocations, setAvailableLocations] = useState<Location[]>([]);
+  const [userLocations, setUserLocations] = useState<any[]>([]);
+  const [availableLocations, setAvailableLocations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -64,7 +64,7 @@ const LocationManagementPage: React.FC = () => {
   };
   
   // Standort wechseln
-  const switchLocation = (location: Location) => {
+  const switchLocation = (location: any) => {
     dispatch(setCurrentLocation(location));
     setSuccessMessage(`Standort zu ${location.name} gewechselt.`);
     setTimeout(() => setSuccessMessage(null), 3000);
@@ -227,45 +227,4 @@ const LocationManagementPage: React.FC = () => {
         <DialogContent>
           <DialogContentText>
             Geben Sie die E-Mail-Adresse des Mitarbeiters ein, den Sie zu diesem Standort einladen möchten,
-            und wählen Sie die entsprechende Rolle aus.
-          </DialogContentText>
-          <TextField
-            autoFocus
-            margin="dense"
-            id="email"
-            label="E-Mail-Adresse"
-            type="email"
-            fullWidth
-            variant="outlined"
-            value={userEmail}
-            onChange={(e) => setUserEmail(e.target.value)}
-            sx={{ mb: 2, mt: 2 }}
-          />
-          <FormControl fullWidth>
-            <InputLabel id="role-select-label">Rolle</InputLabel>
-            <Select
-              labelId="role-select-label"
-              id="role-select"
-              value={role}
-              label="Rolle"
-              onChange={handleRoleChange}
-            >
-              <MenuItem value="teacher">Lehrer</MenuItem>
-              <MenuItem value="office">Büro</MenuItem>
-              <MenuItem value="manager">Leitung</MenuItem>
-              {user?.role === 'developer' && (
-                <MenuItem value="developer">Entwickler</MenuItem>
-              )}
-            </Select>
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseInviteDialog}>Abbrechen</Button>
-          <Button onClick={handleInvite} variant="contained">Einladen</Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
-  );
-};
-
-export default LocationManagementPage;
+            und wäh
