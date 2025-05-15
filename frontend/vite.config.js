@@ -13,5 +13,9 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html')
       }
     }
-  }
+  },
+  server: {
+    historyApiFallback: true
+  },
+  base: '/'
 });
