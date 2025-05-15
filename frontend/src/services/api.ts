@@ -1,4 +1,3 @@
-// frontend/src/services/api.ts
 import axios, { AxiosRequestConfig } from 'axios';
 
 // Konstante für den Token-Schlüssel
@@ -110,6 +109,12 @@ export const getUserLocations = async () => {
 
 export const createLocation = async (name: string) => {
   const response = await api.post('/locations', { name });
+  return response.data;
+};
+
+// Hinzufügen der Standort-Löschfunktion
+export const deleteLocation = async (locationId: string) => {
+  const response = await api.delete(`/locations/${locationId}`);
   return response.data;
 };
 
@@ -232,32 +237,10 @@ export const resendFailedEmails = async (emailIds: string[]) => {
   }
 };
 
+// Benutzer deaktivieren
 export const deactivateUser = async (userId: string) => {
   const response = await api.delete(`/users/${userId}`);
   return response.data;
 };
 
-// frontend/src/services/api.ts - Ergänzen/korrigieren Sie diese Funktionen
-
-// Benutzer deaktivieren
-export const deactivateUser = async (userId: string) => {
-  try {
-    const response = await api.delete(`/users/${userId}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error deactivating user:', error);
-    throw error;
-  }
-};
-
-// Standort löschen
-export const deleteLocation = async (locationId: string) => {
-  try {
-    const response = await api.delete(`/locations/${locationId}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error deleting location:', error);
-    throw error;
-  }
-};
 export default api;
