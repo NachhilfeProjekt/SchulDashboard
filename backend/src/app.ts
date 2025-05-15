@@ -9,108 +9,54 @@ import userRoutes from './routes/userRoutes';
 import locationRoutes from './routes/locationRoutes';
 import buttonRoutes from './routes/buttonRoutes';
 import emailRoutes from './routes/emailRoutes';
+import debugRoute from './routes/debugRoute';
 import { notFound, errorHandler } from './middleware/errorMiddleware';
 import logger from './config/logger';
-import debugRoutes from './routes/debugRoute';
-import { initializeDatabase } from './scripts/initDatabase';
+import pool from './config/database';
 
 // Lade Umgebungsvariablen
 dotenv.config();
 
+// Initialisiere Express App
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// Debug-Routes (nur zur Fehlerbehebung, später entfernen)
-app.use('/debug', debugRoutes);
-
-// CORS-Konfiguration mit mehr Details
-app.use(cors({
-  origin: '*', // In Produktion sollten Sie spezifische Domains angeben
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// Weitere Middleware
+// Middleware
+app.use(cors());
 app.use(helmet());
-app.use(morgan('dev'));
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(morgan('dev'));
 
-// Root-Route für einfache Überprüfung
-app.get('/', (req, res) => {
-  res.status(200).send('Dashboard Backend API is running!');
-});
-
-// Health Check Route
+// Health Check Endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'OK',
-    timestamp: new Date().toISOString()
-  });
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// API-Routen
+// Routen
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/buttons', buttonRoutes);
 app.use('/api/emails', emailRoutes);
-app.use('/api/locations', locationRoutes);
+app.use('/api/debug', debugRoute);
 
-// Alternative Routen ohne /api Präfix für maximale Kompatibilität
-app.use('/auth', authRoutes);
-app.use('/users', userRoutes);
-app.use('/locations', locationRoutes);
-app.use('/buttons', buttonRoutes);
-app.use('/emails', emailRoutes);
-app.use('/locations', locationRoutes);
-
-// Datenbank-Initialisierungsroute - explizit außerhalb der initializeDatabase-Funktion
-app.get('/init-database', async (req: express.Request, res: express.Response) => {
-  try {
-    const success = await initializeDatabase();
-    if (success) {
-      res.status(200).json({ 
-        status: 'OK',
-        message: 'Datenbank erfolgreich initialisiert'
-      });
-    } else {
-      res.status(500).json({ 
-        status: 'ERROR',
-        message: 'Fehler bei der Datenbankinitialisierung'
-      });
-    }
-  } catch (error) {
-    res.status(500).json({ 
-      status: 'ERROR',
-      message: `Unerwarteter Fehler: ${error.message}`
-    });
-  }
-});
-
-// Fehlerbehandlung
+// Error Handling
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 10000;
+// Starte Server
+app.listen(PORT, () => {
+  logger.info(`Server läuft auf Port ${PORT}`);
+  logger.info(`Umgebung: ${process.env.NODE_ENV || 'development'}`);
+});
 
-// Server starten, wenn dies das Hauptmodul ist
-if (require.main === module) {
-  // Initialisiere die Datenbank, bevor der Server startet
-  initializeDatabase()
-    .then(success => {
-      if (success) {
-        logger.info('Datenbank erfolgreich initialisiert.');
-      } else {
-        logger.warn('Fehler bei der Datenbank-Initialisierung. Der Server wird trotzdem gestartet.');
-      }
-      // Starte den Server
-      app.listen(PORT, () => {
-        logger.info(`Server running on port ${PORT}`);
-      });
-    })
-    .catch(err => {
-      logger.error(`Fehler beim Starten des Servers: ${err}`);
-    });
-}
+// Handle Graceful Shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM Signal erhalten. Server wird heruntergefahren.');
+  pool.end().then(() => {
+    logger.info('Datenbankverbindungen geschlossen');
+    process.exit(0);
+  });
+});
 
 export default app;
