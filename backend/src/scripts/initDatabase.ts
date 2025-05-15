@@ -192,4 +192,3 @@ if (require.main === module) {
   performed_at TIMESTAMP DEFAULT NOW(),
   details JSONB
 );
-}
