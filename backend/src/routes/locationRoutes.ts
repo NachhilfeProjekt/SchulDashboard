@@ -1,4 +1,3 @@
-// backend/src/routes/locationRoutes.ts
 import express from 'express';
 import { authenticate, authorize } from '../middleware/authMiddleware';
 import { getLocations, createLocation, getUserLocations, getLocationById, deleteLocation } from '../models/User';
