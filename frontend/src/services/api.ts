@@ -237,4 +237,27 @@ export const deactivateUser = async (userId: string) => {
   return response.data;
 };
 
+// frontend/src/services/api.ts - Ergänzen/korrigieren Sie diese Funktionen
+
+// Benutzer deaktivieren
+export const deactivateUser = async (userId: string) => {
+  try {
+    const response = await api.delete(`/users/${userId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deactivating user:', error);
+    throw error;
+  }
+};
+
+// Standort löschen
+export const deleteLocation = async (locationId: string) => {
+  try {
+    const response = await api.delete(`/locations/${locationId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting location:', error);
+    throw error;
+  }
+};
 export default api;
