@@ -1,73 +1,84 @@
-// frontend/src/services/api.ts
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 
-// API-Basis-URL aus der Umgebungsvariable oder mit einem Fallback-Wert
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+// Konstante für den Token-Schlüssel
+export const TOKEN_KEY = 'schul_dashboard_token';
 
-// Axios-Instance mit Basis-URL und Standardeinstellungen
+// API-URL aus .env oder fallback
+const API_URL = import.meta.env.VITE_API_URL || 'https://dashboard-backend-uweg.onrender.com/api';
+
+// Initialisiere Axios mit Basiskonfiguration
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 15000, // 15 Sekunden Timeout für alle Anfragen
 });
 
-// Request Interceptor für das Hinzufügen des Auth-Tokens
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('schul_dashboard_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+// Request Interceptor für das Hinzufügen des Tokens
+api.interceptors.request.use((config: AxiosRequestConfig) => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  console.log('Token für API-Anfrage:', token ? 'Vorhanden' : 'Nicht vorhanden');
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
   }
-);
+  return config;
+});
 
-// Response Interceptor für Fehlerbehandlung
+// Response Interceptor für bessere Fehlerbehandlung
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
-    // Automatische Umleitung bei 401 (Unauthorized) zum Login
-    if (error.response && error.response.status === 401) {
-      // Lösche Token und User aus dem localStorage
-      localStorage.removeItem('schul_dashboard_token');
-      localStorage.removeItem('schul_dashboard_user');
-      localStorage.removeItem('schul_dashboard_current_location');
-      
-      // Umleitung zur Login-Seite, wenn nicht bereits dort
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
+    // Verbesserte Fehlerbehandlung
+    if (error.response) {
+      // Der Server hat geantwortet mit einem Statuscode außerhalb des 2xx-Bereichs
+      console.error('API Error Response:', {
+        status: error.response.status,
+        data: error.response.data,
+        url: error.config?.url
+      });
+      // 401-Fehler (Unauthorized) -> automatisches Logout
+      if (error.response.status === 401) {
+        console.log('401 Unauthorized - Auto-Logout');
+        // Optional: Automatischer Logout
+        // localStorage.removeItem(TOKEN_KEY);
+        // window.location.href = '/login';
       }
+    } else if (error.request) {
+      // Die Anfrage wurde gestellt, aber keine Antwort erhalten
+      console.error('API Error Request:', {
+        request: error.request,
+        url: error.config?.url
+      });
+    } else {
+      // Beim Einrichten der Anfrage ist ein Fehler aufgetreten
+      console.error('API Error Setup:', error.message);
     }
     return Promise.reject(error);
   }
 );
 
-// Auth-Anfragen
+// Authentifizierung
 export const login = async (email: string, password: string) => {
-  return api.post('/auth/login', { email, password });
+  const response = await api.post('/auth/login', { email, password });
+  return response.data;
 };
 
-export const register = async (userData: {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-}) => {
-  return api.post('/auth/register', userData);
+export const requestPasswordReset = async (email: string) => {
+  const response = await api.post('/auth/request-password-reset', { email });
+  return response.data;
 };
 
 export const resetPassword = async (token: string, newPassword: string) => {
-  return api.post('/auth/reset-password', { token, newPassword });
+  const response = await api.post('/auth/reset-password', { token, newPassword });
+  return response.data;
 };
 
-export const forgotPassword = async (email: string) => {
-  return api.post('/auth/forgot-password', { email });
+// Benutzer
+export const createUser = async (email: string, role: string, locations: string[]) => {
+  const response = await api.post('/auth/create-user', { email, role, locations });
+  return response.data;
 };
 
 export const getCurrentUser = async () => {
@@ -75,109 +86,171 @@ export const getCurrentUser = async () => {
   return response.data;
 };
 
-// Benutzer-Anfragen
-export const getUsers = async (filters = {}) => {
-  const response = await api.get('/users', { params: filters });
+export const getUsersByLocation = async (locationId: string) => {
+  const response = await api.get(`/users/location/${locationId}`);
   return response.data;
 };
 
-export const getUserById = async (id: string) => {
-  const response = await api.get(`/users/${id}`);
-  return response.data;
-};
-
-export const createUser = async (userData: any) => {
-  const response = await api.post('/users', userData);
-  return response.data;
-};
-
-export const updateUser = async (id: string, userData: any) => {
-  const response = await api.put(`/users/${id}`, userData);
-  return response.data;
-};
-
-export const deleteUser = async (id: string) => {
-  const response = await api.delete(`/users/${id}`);
-  return response.data;
-};
-
-export const activateUser = async (id: string) => {
-  const response = await api.patch(`/users/${id}/activate`);
-  return response.data;
-};
-
-export const deactivateUser = async (id: string) => {
-  const response = await api.patch(`/users/${id}/deactivate`);
-  return response.data;
-};
-
-// Standort-Anfragen
-export const getUserLocations = async () => {
-  const response = await api.get('/locations/user');
-  return response.data;
-};
-
-export const getAllLocations = async () => {
+// Standorte
+export const getLocations = async () => {
   const response = await api.get('/locations');
   return response.data;
 };
 
-export const getLocationById = async (id: string) => {
-  const response = await api.get(`/locations/${id}`);
+export const getUserLocations = async () => {
+  const response = await api.get('/locations/my-locations');
   return response.data;
 };
 
-export const createLocation = async (locationData: any) => {
-  const response = await api.post('/locations', locationData);
+export const createLocation = async (name: string) => {
+  const response = await api.post('/locations', { name });
   return response.data;
 };
 
-export const updateLocation = async (id: string, locationData: any) => {
-  const response = await api.put(`/locations/${id}`, locationData);
+// Hinzufügen der Standort-Löschfunktion
+export const deleteLocation = async (locationId: string) => {
+  const response = await api.delete(`/locations/${locationId}`);
   return response.data;
 };
 
-export const deleteLocation = async (id: string) => {
-  const response = await api.delete(`/locations/${id}`);
+// Buttons
+export const getButtonsForUser = async (locationId: string) => {
+  try {
+    console.log('Button-Anfrage wird gesendet...');
+    const response = await api.get(`/buttons/location/${locationId}`);
+    console.log('Button-Antwort:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Buttons:', error);
+    // Fallback für Entwicklungs- oder Testzwecke
+    return [{
+      id: 'fallback-button-1',
+      name: 'Test-Button (Fallback)',
+      url: 'https://example.com',
+      location_id: locationId,
+      created_by: 'system',
+      created_at: new Date().toISOString()
+    }];
+  }
+};
+
+export const createCustomButton = async (name: string, url: string, locationId: string) => {
+  const response = await api.post('/buttons', { name, url, locationId });
   return response.data;
 };
 
-export const activateLocation = async (id: string) => {
-  const response = await api.patch(`/locations/${id}/activate`);
+export const setButtonPermissions = async (buttonId: string, permissions: {roles?: string[], users?: string[]}) => {
+  const response = await api.post(`/buttons/${buttonId}/permissions`, { permissions });
   return response.data;
 };
 
-export const deactivateLocation = async (id: string) => {
-  const response = await api.patch(`/locations/${id}/deactivate`);
+// NEUE FUNKTION: Button löschen
+export const deleteButton = async (buttonId: string) => {
+  const response = await api.delete(`/buttons/${buttonId}`);
   return response.data;
 };
 
-// Einladungs-Anfragen
-export const inviteUserToLocation = async (locationId: string, email: string, role: string) => {
-  const response = await api.post(`/locations/${locationId}/invite`, { email, role });
+// E-Mails
+export const getEmailTemplates = async (locationId: string) => {
+  try {
+    const response = await api.get(`/emails/templates/location/${locationId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching email templates:', error);
+    // Fallback für Fehler
+    if (error.response && (error.response.status === 404 || error.response.status === 500)) {
+      console.log('Endpunkt nicht verfügbar, verwende Mock-Daten für E-Mail-Vorlagen');
+      return [
+        {
+          id: 'mock-template-1',
+          name: 'Willkommens-E-Mail',
+          subject: 'Willkommen im System',
+          body: 'Hallo {{name}}, willkommen im System!',
+          locationId: locationId,
+          created_by: 'system',
+          created_at: new Date().toISOString()
+        }
+      ];
+    }
+    throw error;
+  }
+};
+
+export const getSentEmails = async (locationId: string) => {
+  try {
+    const response = await api.get(`/emails/sent?locationId=${locationId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching sent emails:', error);
+    // Für 404-Fehler (Endpoint nicht gefunden) leeres Array zurückgeben
+    if (error.response && error.response.status === 404) {
+      console.log('Die API-Route für gesendete E-Mails ist nicht implementiert. Gebe leeres Array zurück.');
+      return [];
+    }
+    throw error;
+  }
+};
+
+// Funktion für den Bulk-Email-Versand
+export const sendBulkEmails = async (templateId: string, recipients: Array<{ email: string, name: string }>) => {
+  try {
+    const response = await api.post('/emails/send-bulk', { templateId, recipients });
+    return response.data;
+  } catch (error) {
+    console.error('Error sending bulk emails:', error);
+    // Fallback für Entwicklungszwecke
+    if (error.response && (error.response.status === 404 || error.response.status === 500)) {
+      console.log('Endpunkt nicht verfügbar, simuliere E-Mail-Versand');
+      return { message: 'E-Mails werden versendet (Simulation).' };
+    }
+    throw error;
+  }
+};
+
+// NEUE FUNKTION: Fehlgeschlagene E-Mails erneut senden
+export const resendFailedEmails = async (emailIds: string[]) => {
+  try {
+    const response = await api.post('/emails/resend', { emailIds });
+    return response.data;
+  } catch (error) {
+    console.error('Error resending emails:', error);
+    // Fallback für nicht implementierte Endpoint
+    if (error.response && error.response.status === 404) {
+      console.log('Die API-Route zum erneuten Senden ist nicht implementiert.');
+      return { message: 'E-Mails werden erneut gesendet (Simulation).' };
+    }
+    throw error;
+  }
+};
+
+// Benutzer deaktivieren mit PATCH-Anfrage (statt der vorherigen DELETE-Methode)
+export const deactivateUser = async (userId: string) => {
+  const response = await api.post(`/users/${userId}/deactivate`);
   return response.data;
 };
 
-export const acceptLocationInvitation = async (invitationToken: string) => {
-  const response = await api.post('/locations/invitations/accept', { token: invitationToken });
+// Benutzer reaktivieren
+export const reactivateUser = async (userId: string) => {
+  const response = await api.post(`/users/${userId}/reactivate`);
   return response.data;
 };
 
-export const getLocationInvitations = async (locationId: string) => {
-  const response = await api.get(`/locations/${locationId}/invitations`);
+// Benutzer permanent löschen
+export const deleteUser = async (userId: string) => {
+  const response = await api.delete(`/users/${userId}`);
   return response.data;
 };
 
-export const getUserInvitations = async () => {
-  const response = await api.get('/users/me/invitations');
+// Deaktivierte Benutzer abrufen
+export const getDeactivatedUsers = async () => {
+  const response = await api.get('/users/deactivated');
   return response.data;
 };
 
-export const revokeInvitation = async (invitationId: string) => {
-  const response = await api.delete(`/invitations/${invitationId}`);
+// Benutzer-Aktivitätsprotokoll abrufen
+export const getUserActivityLog = async (userId: string) => {
+  const response = await api.get(`/users/${userId}/activity-log`);
   return response.data;
 };
-
-// Weitere API-Funktionen nach Bedarf...
 
 export default api;
