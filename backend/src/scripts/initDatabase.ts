@@ -184,4 +184,12 @@ if (require.main === module) {
       console.error('Unerwarteter Fehler:', err);
       process.exit(1);
     });
+  CREATE TABLE IF NOT EXISTS user_activity_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id),
+  action VARCHAR(50) NOT NULL,
+  performed_by UUID REFERENCES users(id),
+  performed_at TIMESTAMP DEFAULT NOW(),
+  details JSONB
+);
 }
