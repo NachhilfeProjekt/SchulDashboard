@@ -243,4 +243,34 @@ export const deactivateUser = async (userId: string) => {
   return response.data;
 };
 
+// Benutzer deaktivieren
+export const deactivateUser = async (userId: string) => {
+  const response = await api.post(`/users/${userId}/deactivate`);
+  return response.data;
+};
+
+// Benutzer reaktivieren
+export const reactivateUser = async (userId: string) => {
+  const response = await api.post(`/users/${userId}/reactivate`);
+  return response.data;
+};
+
+// Benutzer permanent löschen
+export const deleteUser = async (userId: string) => {
+  const response = await api.delete(`/users/${userId}`);
+  return response.data;
+};
+
+// Deaktivierte Benutzer abrufen
+export const getDeactivatedUsers = async () => {
+  const response = await api.get('/users/deactivated');
+  return response.data;
+};
+
+// Benutzer-Aktivitätsprotokoll abrufen
+export const getUserActivityLog = async (userId: string) => {
+  const response = await api.get(`/users/${userId}/activity-log`);
+  return response.data;
+};
+
 export default api;
