@@ -29,6 +29,9 @@ const authSlice = createSlice({
       }
       localStorage.setItem('token', action.payload.token);
     },
+    updateUser: (state, action: PayloadAction<User>) => {
+      state.user = action.payload;
+    },
     setCurrentLocation: (state, action: PayloadAction<Location>) => {
       state.currentLocation = action.payload;
       localStorage.setItem('currentLocation', JSON.stringify(action.payload));
@@ -49,5 +52,12 @@ const authSlice = createSlice({
   },
 });
 
-export const { setCredentials, logout, setCurrentLocation, updateUserLocations } = authSlice.actions;
+export const { 
+  setCredentials, 
+  logout, 
+  setCurrentLocation, 
+  updateUserLocations,
+  updateUser 
+} = authSlice.actions;
+
 export default authSlice.reducer;
