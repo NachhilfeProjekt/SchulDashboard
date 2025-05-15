@@ -42,6 +42,8 @@ const App = () => {
           <Route path="admin" element={<AdminPage />} />
           <Route path="create-lead" element={<CreateLeadPage />} />
           <Route path="user-management" element={<UserManagementPage />} /> {/* Neue Route */}
+         <Route path="location-management" element={<LocationManagementPage />} />
+         <Route path="accept-invitation" element={<AcceptInvitationPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Routes>
