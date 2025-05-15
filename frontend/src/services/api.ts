@@ -237,13 +237,7 @@ export const resendFailedEmails = async (emailIds: string[]) => {
   }
 };
 
-// Benutzer deaktivieren
-export const deactivateUser = async (userId: string) => {
-  const response = await api.delete(`/users/${userId}`);
-  return response.data;
-};
-
-// Benutzer deaktivieren
+// Benutzer deaktivieren mit PATCH-Anfrage (statt der vorherigen DELETE-Methode)
 export const deactivateUser = async (userId: string) => {
   const response = await api.post(`/users/${userId}/deactivate`);
   return response.data;
