@@ -1,4 +1,4 @@
-// frontend/src/components/Sidebar.tsx
+// Korrigierte Sidebar.tsx
 import React from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
@@ -24,7 +24,6 @@ const Sidebar: React.FC = () => {
   };
 
   if (!user || !currentLocation) return null;
-
   const isDeveloper = user.role === 'developer';
   const isLead = user.role === 'lead';
 
@@ -41,7 +40,7 @@ const Sidebar: React.FC = () => {
       <Box sx={{ overflow: 'auto' }}>
         <List>
           <ListItem disablePadding>
-            <ListItemButton 
+            <ListItemButton
               onClick={() => handleNavigation('/dashboard')}
               selected={location.pathname === '/dashboard'}
             >
@@ -51,11 +50,10 @@ const Sidebar: React.FC = () => {
               <ListItemText primary="Dashboard" />
             </ListItemButton>
           </ListItem>
-          
           {(isDeveloper || isLead) && (
             <>
               <ListItem disablePadding>
-                <ListItemButton 
+                <ListItemButton
                   onClick={() => handleNavigation('/manage-users')}
                   selected={location.pathname === '/manage-users'}
                 >
@@ -65,9 +63,8 @@ const Sidebar: React.FC = () => {
                   <ListItemText primary="Mitarbeiter" />
                 </ListItemButton>
               </ListItem>
-              
               <ListItem disablePadding>
-                <ListItemButton 
+                <ListItemButton
                   onClick={() => handleNavigation('/email')}
                   selected={location.pathname === '/email'}
                 >
@@ -77,9 +74,8 @@ const Sidebar: React.FC = () => {
                   <ListItemText primary="E-Mails" />
                 </ListItemButton>
               </ListItem>
-              
               <ListItem disablePadding>
-                <ListItemButton 
+                <ListItemButton
                   onClick={() => handleNavigation('/manage-buttons')}
                   selected={location.pathname === '/manage-buttons'}
                 >
@@ -91,37 +87,34 @@ const Sidebar: React.FC = () => {
               </ListItem>
             </>
           )}
-          
           {isDeveloper && (
-            <ListItem disablePadding>
-              <ListItemButton 
-                onClick={() => handleNavigation('/admin')}
-                selected={location.pathname === '/admin'}
-              >
-                <ListItemIcon>
-                  <AdminPanelSettingsIcon />
-                </ListItemIcon>
-                <ListItemText primary="Admin" />
-              </ListItemButton>
-            </ListItem>
+            <>
+              <ListItem disablePadding>
+                <ListItemButton
+                  onClick={() => handleNavigation('/admin')}
+                  selected={location.pathname === '/admin'}
+                >
+                  <ListItemIcon>
+                    <AdminPanelSettingsIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Admin" />
+                </ListItemButton>
+              </ListItem>
+              <ListItem disablePadding>
+                <ListItemButton
+                  onClick={() => handleNavigation('/user-management')}
+                  selected={location.pathname === '/user-management'}
+                >
+                  <ListItemIcon>
+                    <PeopleIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Erw. Benutzerverwaltung" />
+                </ListItemButton>
+              </ListItem>
+            </>
           )}
-
-          {(isDeveloper || isLead) && (
-  <ListItem disablePadding>
-    <ListItemButton
-      onClick={() => handleNavigation('/location-management')}
-      selected={location.pathname === '/location-management'}
-    >
-      <ListItemIcon>
-        <LocationOnIcon />
-      </ListItemIcon>
-      <ListItemText primary="Standortverwaltung" />
-    </ListItemButton>
-  </ListItem>
-)}
-          
           <ListItem disablePadding>
-            <ListItemButton 
+            <ListItemButton
               onClick={() => handleNavigation('/settings')}
               selected={location.pathname === '/settings'}
             >
@@ -135,19 +128,6 @@ const Sidebar: React.FC = () => {
       </Box>
     </Drawer>
   );
-  {isDeveloper && (
-  <ListItem disablePadding>
-    <ListItemButton 
-      onClick={() => handleNavigation('/user-management')}
-      selected={location.pathname === '/user-management'}
-    >
-      <ListItemIcon>
-        <PeopleIcon />
-      </ListItemIcon>
-      <ListItemText primary="Erw. Benutzerverwaltung" />
-    </ListItemButton>
-  </ListItem>
-)}
 };
 
 export default Sidebar;
