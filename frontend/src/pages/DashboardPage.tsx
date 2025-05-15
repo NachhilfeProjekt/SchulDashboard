@@ -3,13 +3,14 @@ import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { RootState } from '../store/store';
-import axios from 'axios';
-import { Box, Button, Grid, Typography, Paper, CircularProgress } from '@mui/material';
+import { getButtonsForUser } from '../services/api';
+import { Box, Button, Grid, Typography, Paper, CircularProgress, Alert } from '@mui/material';
 
 const DashboardPage: React.FC = () => {
   const { user, currentLocation } = useSelector((state: RootState) => state.auth);
   const [customButtons, setCustomButtons] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,32 +24,13 @@ const DashboardPage: React.FC = () => {
     if (!currentLocation) return;
     
     setLoading(true);
+    setError('');
     try {
-      const token = localStorage.getItem('schul_dashboard_token');
-      
-      if (token) {
-        try {
-          console.log('Button-Anfrage wird gesendet...');
-          const response = await axios.get(
-            `https://dashboard-backend-uweg.onrender.com/api/buttons/location/${currentLocation.id}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            }
-          );
-          
-          console.log('Button-Antwort:', response.data);
-          
-          if (response.data && Array.isArray(response.data)) {
-            setCustomButtons(response.data);
-          }
-        } catch (error) {
-          console.error('Fehler beim Abrufen der Buttons:', error);
-        }
-      }
+      const buttons = await getButtonsForUser(currentLocation.id);
+      setCustomButtons(buttons);
     } catch (error) {
-      console.error('Fehler in fetchCustomButtons:', error);
+      console.error('Fehler beim Abrufen der Buttons:', error);
+      setError('Fehler beim Laden der Buttons. Bitte versuchen Sie es später erneut.');
     } finally {
       setLoading(false);
     }
@@ -59,11 +41,43 @@ const DashboardPage: React.FC = () => {
     navigate(path);
   };
 
+  // Loading-Anzeige
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // Fehleranzeige
+  if (error) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+        <Button variant="contained" onClick={() => fetchCustomButtons()}>
+          Erneut versuchen
+        </Button>
+      </Box>
+    );
+  }
+
   // Fallback, wenn kein Benutzer oder Standort verfügbar ist
   if (!user || !currentLocation) {
     return (
       <Box sx={{ p: 3 }}>
-        <Typography>Keine Benutzer- oder Standortdaten vorhanden. <a href="/login">Zurück zum Login</a></Typography>
+        <Typography>
+          Keine Benutzer- oder Standortdaten vorhanden. <a href="/" onClick={(e) => {
+            e.preventDefault();
+            localStorage.removeItem('schul_dashboard_token');
+            localStorage.removeItem('schul_dashboard_user');
+            localStorage.removeItem('schul_dashboard_locations');
+            localStorage.removeItem('schul_dashboard_current_location');
+            window.location.href = '/login';
+          }}>Zurück zum Login</a>
+        </Typography>
       </Box>
     );
   }
@@ -182,12 +196,6 @@ const DashboardPage: React.FC = () => {
             ))}
           </Grid>
         </>
-      )}
-      
-      {loading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-          <CircularProgress />
-        </Box>
       )}
     </Box>
   );
