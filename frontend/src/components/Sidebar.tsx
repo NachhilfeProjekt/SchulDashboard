@@ -105,6 +105,20 @@ const Sidebar: React.FC = () => {
               </ListItemButton>
             </ListItem>
           )}
+
+          {(isDeveloper || isLead) && (
+  <ListItem disablePadding>
+    <ListItemButton
+      onClick={() => handleNavigation('/location-management')}
+      selected={location.pathname === '/location-management'}
+    >
+      <ListItemIcon>
+        <LocationOnIcon />
+      </ListItemIcon>
+      <ListItemText primary="Standortverwaltung" />
+    </ListItemButton>
+  </ListItem>
+)}
           
           <ListItem disablePadding>
             <ListItemButton 
