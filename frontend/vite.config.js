@@ -1,44 +1,30 @@
-// frontend/vite.config.js
+// frontend/vite.config.js oder vite.config.ts
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { resolve } from 'path';
-import fs from 'fs';
 import path from 'path';
 
-// Kopieren von staticsitesettings.json in das Ausgabeverzeichnis
-const copyStaticSiteSettings = () => {
-  return {
-    name: 'copy-static-site-settings',
-    generateBundle() {
-      const settingsPath = path.resolve(__dirname, 'staticsitesettings.json');
-      if (fs.existsSync(settingsPath)) {
-        const settingsContent = fs.readFileSync(settingsPath, 'utf8');
-        this.emitFile({
-          type: 'asset',
-          fileName: 'staticsitesettings.json',
-          source: settingsContent
-        });
-      }
-    }
-  };
-};
-
 export default defineConfig({
-  plugins: [
-    react(),
-    copyStaticSiteSettings()
-  ],
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   build: {
     outDir: 'dist',
-    assetsDir: 'assets',
+    sourcemap: true,
+    // Reduziere die Chunkgröße für bessere Modularität
     rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'index.html')
-      }
-    }
+      output: {
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        },
+      },
+    },
   },
-  server: {
-    historyApiFallback: true
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom', 'react-redux', '@mui/material'],
   },
-  base: '/'
 });
