@@ -1,16 +1,35 @@
-// frontend/src/App.tsx mit UsersPage und ProfilePage aktiviert
+// frontend/src/App.tsx
 import React from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { store } from './store/store';
 import LoginPage from './pages/LoginPage';
 import Layout from './components/Layout';
 import DashboardPage from './pages/DashboardPage';
 import LocationManagementPage from './pages/LocationManagementPage';
-import UsersPage from './pages/UsersPage';
-import ProfilePage from './pages/ProfilePage';
-import NotFoundPage from './pages/NotFoundPage';
-import './App.css';
+import { Box, Typography, Paper, Button } from '@mui/material';
+
+// Inline NotFoundPage-Komponente anstatt eine separate Datei zu importieren
+const NotFound = () => (
+  <Box sx={{ p: 3, textAlign: 'center' }}>
+    <Paper sx={{ p: 4, maxWidth: 500, mx: 'auto', mt: 4 }}>
+      <Typography variant="h4" component="h1" gutterBottom>
+        404 - Seite nicht gefunden
+      </Typography>
+      <Typography paragraph>
+        Die angeforderte Seite existiert nicht oder wurde verschoben.
+      </Typography>
+      <Button 
+        variant="contained" 
+        color="primary" 
+        onClick={() => window.location.href = '/dashboard'}
+        sx={{ mt: 2 }}
+      >
+        Zurück zum Dashboard
+      </Button>
+    </Paper>
+  </Box>
+);
 
 const router = createBrowserRouter([
   {
@@ -23,7 +42,7 @@ const router = createBrowserRouter([
     children: [
       {
         path: '/',
-        element: <DashboardPage />,
+        element: <Navigate to="/dashboard" replace />,
       },
       {
         path: 'dashboard',
@@ -34,16 +53,9 @@ const router = createBrowserRouter([
         element: <LocationManagementPage />,
       },
       {
-        path: 'users',
-        element: <UsersPage />,
-      },
-      {
-        path: 'profile',
-        element: <ProfilePage />,
-      },
-      {
+        // Fallback-Route für alle nicht existierenden Pfade
         path: '*',
-        element: <NotFoundPage />,
+        element: <NotFound />,
       },
     ],
   },
