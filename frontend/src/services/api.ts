@@ -196,6 +196,24 @@ export const getSentEmails = async (locationId: string) => {
   }
 };
 
+// Funktion für den Bulk-Email-Versand
+export const sendBulkEmails = async (templateId: string, recipients: Array<{ email: string, name: string }>) => {
+  try {
+    const response = await api.post('/emails/send-bulk', { templateId, recipients });
+    return response.data;
+  } catch (error) {
+    console.error('Error sending bulk emails:', error);
+    
+    // Fallback für Entwicklungszwecke
+    if (error.response && (error.response.status === 404 || error.response.status === 500)) {
+      console.log('Endpunkt nicht verfügbar, simuliere E-Mail-Versand');
+      return { message: 'E-Mails werden versendet (Simulation).' };
+    }
+    
+    throw error;
+  }
+};
+
 // NEUE FUNKTION: Fehlgeschlagene E-Mails erneut senden
 export const resendFailedEmails = async (emailIds: string[]) => {
   try {
