@@ -308,4 +308,21 @@ export const getUserInactiveLocations = async (userId: string) => {
   const response = await api.get(`/users/${userId}/inactive-locations`);
   return response.data;
 };
+
+export const getAllLocations = async () => {
+  const response = await api.get('/locations');
+  return response.data;
+};
+
+// Benutzer zu einem Standort einladen
+export const inviteUserToLocation = async (locationId: string, email: string, role: string) => {
+  const response = await api.post(`/locations/${locationId}/invite`, { email, role });
+  return response.data;
+};
+
+// Standorteinladung annehmen
+export const acceptLocationInvitation = async (invitationToken: string) => {
+  const response = await api.post('/locations/invitations/accept', { token: invitationToken });
+  return response.data;
+};
 export default api;
