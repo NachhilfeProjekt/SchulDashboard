@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
-import { getLocations, createLocation } from '../services/api';
+import { getLocations, createLocation, deleteLocation } from '../services/api';
 import { 
   Box, Button, Typography, Paper, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Dialog, DialogTitle, 
@@ -16,11 +16,46 @@ const AdminPage: React.FC = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
+  const [locationToDelete, setLocationToDelete] = useState<any | null>(null);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [success, setSuccess] = useState('');
   const [newLocation, setNewLocation] = useState({
     name: ''
   });
-
+  
+ const handleDeleteLocation = async (location: any) => {
+    setLocationToDelete(location);
+    setConfirmDialogOpen(true);
+  };
+  
+  const confirmDeleteLocation = async () => {
+    if (!locationToDelete) return;
+    
+    setDeleteLoading(locationToDelete.id);
+    setError('');
+    setSuccess('');
+    
+    try {
+      await deleteLocation(locationToDelete.id);
+      setSuccess(`Standort "${locationToDelete.name}" wurde erfolgreich gelöscht.`);
+      await fetchLocations();
+    } catch (error) {
+      console.error('Error deleting location:', error);
+      
+      // Spezifischere Fehlermeldungen basierend auf der API-Antwort
+      if (error.response?.data?.message) {
+        setError(error.response.data.message);
+      } else {
+        setError('Fehler beim Löschen des Standorts.');
+      }
+    } finally {
+      setDeleteLoading(null);
+      setLocationToDelete(null);
+      setConfirmDialogOpen(false);
+    }
+  };
+  
   useEffect(() => {
     if (user?.role === 'developer') {
       fetchLocations();
@@ -173,5 +208,61 @@ const AdminPage: React.FC = () => {
     </Box>
   );
 };
-
+  return (
+    <Box sx={{ p: 3 }}>
+      {/* ... (bestehender Code) */}
+      
+      <TableRow key={location.id}>
+        <TableCell>{location.name}</TableCell>
+        <TableCell align="right">
+          <Button 
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => handleDeleteLocation(location)}
+            disabled={deleteLoading === location.id}
+          >
+            {deleteLoading === location.id ? (
+              <CircularProgress size={24} />
+            ) : (
+              'Löschen'
+            )}
+          </Button>
+        </TableCell>
+      </TableRow>
+      
+      {/* ... (bestehender Code) */}
+      
+      {/* Bestätigungsdialog für das Löschen von Standorten */}
+      <Dialog
+        open={confirmDialogOpen}
+        onClose={() => setConfirmDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Standort löschen</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Möchten Sie den Standort "{locationToDelete?.name}" wirklich löschen?
+          </Typography>
+          <Typography variant="caption" color="error" sx={{ mt: 2, display: 'block' }}>
+            Hinweis: Der Standort kann nur gelöscht werden, wenn er nicht mehr mit Benutzern, Buttons oder E-Mail-Vorlagen verknüpft ist.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDialogOpen(false)} disabled={deleteLoading !== null}>
+            Abbrechen
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={confirmDeleteLocation}
+            disabled={deleteLoading !== null}
+          >
+            Löschen
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
 export default AdminPage;
