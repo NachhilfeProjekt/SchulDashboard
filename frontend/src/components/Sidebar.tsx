@@ -121,6 +121,19 @@ const Sidebar: React.FC = () => {
       </Box>
     </Drawer>
   );
+  {isDeveloper && (
+  <ListItem disablePadding>
+    <ListItemButton 
+      onClick={() => handleNavigation('/user-management')}
+      selected={location.pathname === '/user-management'}
+    >
+      <ListItemIcon>
+        <PeopleIcon />
+      </ListItemIcon>
+      <ListItemText primary="Erw. Benutzerverwaltung" />
+    </ListItemButton>
+  </ListItem>
+)}
 };
 
 export default Sidebar;
