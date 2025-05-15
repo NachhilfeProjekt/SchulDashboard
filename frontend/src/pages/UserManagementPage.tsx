@@ -375,7 +375,7 @@ const UserManagementPage: React.FC = () => {
           <Button
             variant="contained"
             color={confirmAction === 'reactivate' ? 'primary' : 'error'}
-            onClick={handleConfirmAction} {/* Hier zur umbenannten Funktion ändern */}
+            onClick={handleConfirmAction} // Hier zur umbenannten Funktion ändern
             disabled={actionLoading !== null}
           >
             {confirmAction === 'reactivate' ? 'Reaktivieren' : 'Permanent löschen'}
