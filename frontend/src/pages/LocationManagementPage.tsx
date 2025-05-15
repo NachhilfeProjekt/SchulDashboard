@@ -227,4 +227,45 @@ const LocationManagementPage: React.FC = () => {
         <DialogContent>
           <DialogContentText>
             Geben Sie die E-Mail-Adresse des Mitarbeiters ein, den Sie zu diesem Standort einladen möchten,
-            und wäh
+            und wählen Sie die entsprechende Rolle aus.
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            id="email"
+            label="E-Mail-Adresse"
+            type="email"
+            fullWidth
+            variant="outlined"
+            value={userEmail}
+            onChange={(e) => setUserEmail(e.target.value)}
+            sx={{ mb: 2, mt: 2 }}
+          />
+          <FormControl fullWidth>
+            <InputLabel id="role-select-label">Rolle</InputLabel>
+            <Select
+              labelId="role-select-label"
+              id="role-select"
+              value={role}
+              label="Rolle"
+              onChange={handleRoleChange}
+            >
+              <MenuItem value="teacher">Lehrer</MenuItem>
+              <MenuItem value="office">Büro</MenuItem>
+              <MenuItem value="manager">Leitung</MenuItem>
+              {user?.role === 'developer' && (
+                <MenuItem value="developer">Entwickler</MenuItem>
+              )}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseInviteDialog}>Abbrechen</Button>
+          <Button onClick={handleInvite} variant="contained">Einladen</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default LocationManagementPage;
