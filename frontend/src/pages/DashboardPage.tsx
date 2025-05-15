@@ -5,43 +5,66 @@ import { useNavigate } from 'react-router-dom';
 import { RootState } from '../store/store';
 import { getButtonsForUser } from '../services/api';
 import { Box, Button, Grid, Typography, Paper, CircularProgress, Alert } from '@mui/material';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import PeopleIcon from '@mui/icons-material/People';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import SettingsIcon from '@mui/icons-material/Settings';
+import SchoolIcon from '@mui/icons-material/School';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 
 const DashboardPage: React.FC = () => {
   const { user, currentLocation } = useSelector((state: RootState) => state.auth);
-  const [customButtons, setCustomButtons] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [buttons, setButtons] = useState<any[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (user && currentLocation) {
-      console.log('Dashboard: User und Standort vorhanden', { user, currentLocation });
-      fetchCustomButtons();
+      console.log('Dashboard: User und Standort vorhanden', user);
+      const loadButtons = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          const buttonsData = await getButtonsForUser();
+          setButtons(buttonsData);
+        } catch (err) {
+          console.error('Fehler beim Abrufen der Buttons:', err);
+          setError('Fehler beim Laden der Buttons. Bitte versuchen Sie es später erneut.');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      loadButtons();
     }
   }, [user, currentLocation]);
 
-  const fetchCustomButtons = async () => {
-    if (!currentLocation) return;
-    
-    setLoading(true);
-    setError('');
-    try {
-      const buttons = await getButtonsForUser(currentLocation.id);
-      setCustomButtons(buttons);
-    } catch (error) {
-      console.error('Fehler beim Abrufen der Buttons:', error);
-      setError('Fehler beim Laden der Buttons. Bitte versuchen Sie es später erneut.');
-    } finally {
-      setLoading(false);
+  const getIconByName = (iconName: string) => {
+    switch (iconName) {
+      case 'Dashboard':
+        return <DashboardIcon fontSize="large" />;
+      case 'People':
+        return <PeopleIcon fontSize="large" />;
+      case 'LocationOn':
+        return <LocationOnIcon fontSize="large" />;
+      case 'Settings':
+        return <SettingsIcon fontSize="large" />;
+      case 'School':
+        return <SchoolIcon fontSize="large" />;
+      case 'Assessment':
+        return <AssessmentIcon fontSize="large" />;
+      case 'Receipt':
+        return <ReceiptIcon fontSize="large" />;
+      case 'CalendarToday':
+        return <CalendarTodayIcon fontSize="large" />;
+      default:
+        return <DashboardIcon fontSize="large" />;
     }
   };
 
-  // Handle navigation with React Router
-  const handleNavigation = (path: string) => {
-    navigate(path);
-  };
-
-  // Loading-Anzeige
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
@@ -50,153 +73,64 @@ const DashboardPage: React.FC = () => {
     );
   }
 
-  // Fehleranzeige
-  if (error) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-        <Button variant="contained" onClick={() => fetchCustomButtons()}>
-          Erneut versuchen
-        </Button>
-      </Box>
-    );
-  }
-
-  // Fallback, wenn kein Benutzer oder Standort verfügbar ist
-  if (!user || !currentLocation) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography>
-          Keine Benutzer- oder Standortdaten vorhanden. <a href="/" onClick={(e) => {
-            e.preventDefault();
-            localStorage.removeItem('schul_dashboard_token');
-            localStorage.removeItem('schul_dashboard_user');
-            localStorage.removeItem('schul_dashboard_locations');
-            localStorage.removeItem('schul_dashboard_current_location');
-            window.location.href = '/login';
-          }}>Zurück zum Login</a>
-        </Typography>
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ p: 3 }}>
-      <Paper sx={{ p: 3, mb: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          Willkommen, {user.email}
-        </Typography>
-        
-        <Typography variant="h6" gutterBottom>
-          Aktueller Standort: {currentLocation.name}
-        </Typography>
-      </Paper>
-      
-      <Typography variant="h5" gutterBottom>
-        System-Funktionen
+      <Typography variant="h4" gutterBottom>
+        Dashboard
       </Typography>
       
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {(user.role === 'developer' || user.role === 'lead') && (
-          <>
-            <Grid item xs={12} sm={6} md={4}>
-              <Button
-                variant="contained"
-                fullWidth
-                sx={{ height: '100px' }}
-                onClick={() => handleNavigation('/manage-users')}
-              >
-                Mitarbeiter verwalten
-              </Button>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={4}>
-              <Button
-                variant="contained"
-                fullWidth
-                sx={{ height: '100px' }}
-                onClick={() => handleNavigation('/email')}
-              >
-                E-Mails versenden
-              </Button>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={4}>
-              <Button
-                variant="contained"
-                fullWidth
-                sx={{ height: '100px' }}
-                onClick={() => handleNavigation('/manage-buttons')}
-              >
-                Buttons verwalten
-              </Button>
-            </Grid>
-          </>
-        )}
-        
-        {user.role === 'developer' && (
-          <>
-            <Grid item xs={12} sm={6} md={4}>
-              <Button
-                variant="contained"
-                fullWidth
-                sx={{ height: '100px' }}
-                onClick={() => handleNavigation('/create-lead')}
-              >
-                Leitungsaccount erstellen
-              </Button>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={4}>
-              <Button
-                variant="contained"
-                fullWidth
-                sx={{ height: '100px' }}
-                onClick={() => handleNavigation('/admin')}
-              >
-                Admin
-              </Button>
-            </Grid>
-          </>
-        )}
-        
-        <Grid item xs={12} sm={6} md={4}>
-          <Button
-            variant="contained"
-            fullWidth
-            sx={{ height: '100px' }}
-            onClick={() => handleNavigation('/settings')}
-          >
-            Einstellungen
-          </Button>
-        </Grid>
-      </Grid>
-      
-      {customButtons.length > 0 && (
-        <>
-          <Typography variant="h5" gutterBottom>
-            Benutzerdefinierte Links
-          </Typography>
-          
-          <Grid container spacing={3}>
-            {customButtons.map((button) => (
-              <Grid item xs={12} sm={6} md={4} key={button.id}>
-                <a href={button.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', display: 'block', width: '100%' }}>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    sx={{ height: '100px' }}
-                  >
-                    {button.name}
-                  </Button>
-                </a>
-              </Grid>
-            ))}
-          </Grid>
-        </>
+      {error && (
+        <Alert severity="warning" sx={{ mb: 4 }}>
+          {error}
+        </Alert>
       )}
+      
+      <Grid container spacing={3}>
+        {buttons.map((button) => (
+          <Grid item xs={12} sm={6} md={4} key={button.id}>
+            <Paper
+              sx={{
+                p: 3,
+                display: 'flex',
+                flexDirection: 'column',
+                height: 200,
+                cursor: 'pointer',
+                transition: 'transform 0.3s, box-shadow 0.3s',
+                '&:hover': {
+                  transform: 'translateY(-5px)',
+                  boxShadow: 6,
+                },
+                borderTop: `4px solid ${button.color || '#2196f3'}`,
+              }}
+              onClick={() => navigate(button.route)}
+            >
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  mb: 2,
+                  color: button.color || '#2196f3',
+                }}
+              >
+                {getIconByName(button.icon)}
+                <Typography variant="h5" sx={{ ml: 1 }}>
+                  {button.title}
+                </Typography>
+              </Box>
+              <Typography variant="body1" color="text.secondary" sx={{ flex: 1 }}>
+                {button.description}
+              </Typography>
+              <Button
+                variant="outlined"
+                sx={{ mt: 2, color: button.color || '#2196f3', borderColor: button.color || '#2196f3' }}
+                onClick={() => navigate(button.route)}
+              >
+                Öffnen
+              </Button>
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
     </Box>
   );
 };
