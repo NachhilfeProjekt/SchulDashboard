@@ -17,9 +17,6 @@ import { User } from '../types';
 const ManageUsersPage: React.FC = () => {
   const { user: currentUser, currentLocation } = useSelector((state: RootState) => state.auth);
   const [users, setUsers] = useState<User[]>([]);
-  const [deactivateLoading, setDeactivateLoading] = useState<string | null>(null);
-  const [userToDeactivate, setUserToDeactivate] = useState<any | null>(null);
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,6 +26,10 @@ const ManageUsersPage: React.FC = () => {
     role: 'teacher',
     locations: currentLocation ? [currentLocation.id] : []
   });
+  const [deactivateLoading, setDeactivateLoading] = useState<string | null>(null);
+  const [userToDeactivate, setUserToDeactivate] = useState<any | null>(null);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -37,38 +38,6 @@ const ManageUsersPage: React.FC = () => {
     }
   }, [currentLocation]);
 
-  const handleDeactivateUser = (user: any) => {
-    setUserToDeactivate(user);
-    setConfirmDialogOpen(true);
-  };
-  
-  const confirmDeactivateUser = async () => {
-    if (!userToDeactivate) return;
-    
-    setDeactivateLoading(userToDeactivate.id);
-    setError('');
-    setSuccess('');
-    
-    try {
-      await deactivateUser(userToDeactivate.id);
-      setSuccess(`Benutzer "${userToDeactivate.email}" wurde erfolgreich deaktiviert.`);
-      await fetchUsers();
-    } catch (error) {
-      console.error('Error deactivating user:', error);
-      
-      // Spezifischere Fehlermeldungen basierend auf der API-Antwort
-      if (error.response?.data?.message) {
-        setError(error.response.data.message);
-      } else {
-        setError('Fehler beim Deaktivieren des Benutzers.');
-      }
-    } finally {
-      setDeactivateLoading(null);
-      setUserToDeactivate(null);
-      setConfirmDialogOpen(false);
-    }
-  };
-  
   const fetchUsers = async () => {
     if (!currentLocation) return;
     
@@ -108,19 +77,35 @@ const ManageUsersPage: React.FC = () => {
     }
   };
 
-  const handleDeactivateUser = async (userId: string, userName: string) => {
-    if (window.confirm(`Möchten Sie den Benutzer "${userName}" wirklich deaktivieren?`)) {
-      setLoading(true);
-      try {
-        await deactivateUser(userId);
-        setSuccess('Benutzer wurde erfolgreich deaktiviert.');
-        await fetchUsers();
-      } catch (error) {
-        console.error('Error deactivating user:', error);
+  const handleDeactivateUserClick = (user: any) => {
+    setUserToDeactivate(user);
+    setConfirmDialogOpen(true);
+  };
+  
+  const confirmDeactivateUser = async () => {
+    if (!userToDeactivate) return;
+    
+    setDeactivateLoading(userToDeactivate.id);
+    setError('');
+    setSuccess('');
+    
+    try {
+      await deactivateUser(userToDeactivate.id);
+      setSuccess(`Benutzer "${userToDeactivate.email}" wurde erfolgreich deaktiviert.`);
+      await fetchUsers();
+    } catch (error) {
+      console.error('Error deactivating user:', error);
+      
+      // Spezifischere Fehlermeldungen basierend auf der API-Antwort
+      if (error.response?.data?.message) {
+        setError(error.response.data.message);
+      } else {
         setError('Fehler beim Deaktivieren des Benutzers.');
-      } finally {
-        setLoading(false);
       }
+    } finally {
+      setDeactivateLoading(null);
+      setUserToDeactivate(null);
+      setConfirmDialogOpen(false);
     }
   };
 
@@ -215,14 +200,19 @@ const ManageUsersPage: React.FC = () => {
                         <EditIcon />
                       </IconButton>
                       <IconButton 
-                        onClick={() => handleDeactivateUser(user.id, user.email)}
+                        onClick={() => handleDeactivateUserClick(user)}
                         disabled={
                           user.role === 'developer' && currentUser.role !== 'developer' ||
                           user.id === currentUser.id ||
-                          loading
+                          loading ||
+                          deactivateLoading === user.id
                         }
                       >
-                        <DeleteIcon color="error" />
+                        {deactivateLoading === user.id ? (
+                          <CircularProgress size={24} />
+                        ) : (
+                          <DeleteIcon color="error" />
+                        )}
                       </IconButton>
                     </TableCell>
                   </TableRow>
@@ -284,30 +274,6 @@ const ManageUsersPage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
-  );
-};
-  return (
-    <Box sx={{ p: 3 }}>
-      {/* ... (bestehender Code) */}
-      
-      <IconButton 
-        onClick={() => handleDeactivateUser(user)}
-        disabled={
-          user.role === 'developer' && currentUser.role !== 'developer' ||
-          user.id === currentUser.id ||
-          loading ||
-          deactivateLoading === user.id
-        }
-      >
-        {deactivateLoading === user.id ? (
-          <CircularProgress size={24} />
-        ) : (
-          <DeleteIcon color="error" />
-        )}
-      </IconButton>
-      
-      {/* ... (bestehender Code) */}
       
       {/* Bestätigungsdialog für die Deaktivierung von Benutzern */}
       <Dialog
