@@ -82,6 +82,7 @@ const AppRoutes = () => {
         <Route path="admin" element={<AdminPage />} />
         <Route path="create-lead" element={<CreateLeadPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="user-management" element={<UserManagementPage />} />
       </Route>
     </Routes>
   );
