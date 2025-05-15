@@ -20,8 +20,8 @@ const isAuthenticated = () => {
 };
 
 // Einfache Private Route Komponente
-const PrivateRoute = ({ element }) => {
-  return isAuthenticated() ? element : <Navigate to="/login" replace />;
+const PrivateRoute = ({ element }: { element: React.ReactNode }) => {
+  return isAuthenticated() ? <>{element}</> : <Navigate to="/login" replace />;
 };
 
 const App = () => {
@@ -47,7 +47,6 @@ const App = () => {
   );
 };
 
-// Hauptkomponente mit Redux Provider
 const AppWithRedux = () => {
   return (
     <Provider store={store}>
