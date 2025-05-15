@@ -99,28 +99,32 @@ const EmailPage: React.FC = () => {
     setRecipients(newRecipients);
   };
 
-  const handleSendEmails = async () => {
-    if (!selectedTemplate || recipients.length === 0) return;
+  // In EmailPage.tsx, ändere die handleSendEmails-Funktion wie folgt:
+
+const handleSendEmails = async () => {
+  if (!selectedTemplate || recipients.length === 0) return;
+  
+  setLoading(true);
+  try {
+    await sendBulkEmails(selectedTemplate, recipients);
+    setRecipients([]);
+    setSelectedTemplate('');
     
-    setLoading(true);
-    try {
-      await sendBulkEmails(selectedTemplate, recipients);
-      setRecipients([]);
-      setSelectedTemplate('');
+    // Refresh sent emails list
+    const fetchedSentEmails = await getSentEmails(currentLocation?.id || '');
+    setSentEmails(fetchedSentEmails);
+    
+    // Switch to sent emails tab
+    setTabValue(1);
+  } catch (error) {
+    console.error('Fehler beim Senden der E-Mails:', error);
+    alert('Fehler beim Senden der E-Mails. Bitte versuchen Sie es später erneut.');
+  } finally {
+    setLoading(false);
+  }
+};
       
-      // Refresh sent emails list
-      const fetchedSentEmails = await getSentEmails(currentLocation?.id || '');
-      setSentEmails(fetchedSentEmails);
-      
-      // Switch to sent emails tab
-      setTabValue(1);
-    } catch (error) {
-      console.error('Fehler beim Senden der E-Mails:', error);
-      alert('Fehler beim Senden der E-Mails. Bitte versuchen Sie es später erneut.');
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
