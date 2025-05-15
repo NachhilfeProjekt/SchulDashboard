@@ -267,4 +267,45 @@ export const getUserActivityLog = async (userId: string) => {
   return response.data;
 };
 
+// Funktion zum Einladen eines Benutzers zu einem Standort
+export const inviteUserToLocation = async (email: string, locationId: string, role: string) => {
+  const response = await api.post('/locations/invite', { email, locationId, role });
+  return response.data;
+};
+
+// Akzeptieren einer Standort-Einladung
+export const acceptLocationInvitation = async (token: string, password: string) => {
+  const response = await api.post('/locations/accept-invitation', { token, password });
+  return response.data;
+};
+
+// Standort wechseln
+export const switchLocation = async (locationId: string) => {
+  // Aktualisiere nur den lokalen Zustand mit der setCurrentLocation-Aktion
+  return { success: true, locationId };
+};
+
+// Benutzer pro Standort aktivieren/deaktivieren
+export const toggleUserLocationStatus = async (userId: string, locationId: string, isActive: boolean) => {
+  const response = await api.post(`/users/${userId}/locations/${locationId}/toggle-status`, { isActive });
+  return response.data;
+};
+
+// Benutzer zu Standort hinzufügen (für Leads und Developer)
+export const addUserToLocation = async (userId: string, locationId: string) => {
+  const response = await api.post(`/users/${userId}/locations`, { locationId });
+  return response.data;
+};
+
+// Eine Liste aller Standorte abrufen (für Dropdown zur Auswahl)
+export const getAllLocations = async () => {
+  const response = await api.get('/locations/all');
+  return response.data;
+};
+
+// Abrufen der Standorte, an denen ein Benutzer deaktiviert ist
+export const getUserInactiveLocations = async (userId: string) => {
+  const response = await api.get(`/users/${userId}/inactive-locations`);
+  return response.data;
+};
 export default api;
