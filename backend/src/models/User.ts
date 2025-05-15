@@ -370,47 +370,6 @@ export const createEmailTemplate = async (
   }
 };
 
-// Füge diese Funktion zum User.ts-Modell hinzu
-
-export const setButtonPermissions = async (buttonId: string, permissions: { roles?: string[], users?: string[] }): Promise<void> => {
-  const client = await pool.connect();
-  
-  try {
-    await client.query('BEGIN');
-    
-    // Delete existing permissions
-    await client.query('DELETE FROM button_permissions WHERE button_id = $1', [buttonId]);
-    
-    // Add role permissions
-    if (permissions.roles?.length) {
-      for (const role of permissions.roles) {
-        await client.query(
-          'INSERT INTO button_permissions (button_id, role) VALUES ($1, $2)',
-          [buttonId, role]
-        );
-      }
-    }
-    
-    // Add user permissions
-    if (permissions.users?.length) {
-      for (const userId of permissions.users) {
-        await client.query(
-          'INSERT INTO button_permissions (button_id, user_id) VALUES ($1, $2)',
-          [buttonId, userId]
-        );
-      }
-    }
-    
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK');
-    logger.error(`Fehler beim Setzen der Button-Berechtigungen: ${error}`);
-    throw error;
-  } finally {
-    client.release();
-  }
-};
-
 // Füge diese Funktion zum Löschen von Buttons hinzu
 export const deleteButton = async (buttonId: string): Promise<void> => {
   const client = await pool.connect();
@@ -431,56 +390,6 @@ export const deleteButton = async (buttonId: string): Promise<void> => {
     throw error;
   } finally {
     client.release();
-  }
-};
-
-// Modifizierte Funktion für das Abrufen der Buttons mit verbesserten Berechtigungen
-export const getButtonsForUser = async (userId: string, locationId: string): Promise<CustomButton[]> => {
-  try {
-    console.log(`getButtonsForUser aufgerufen mit userId=${userId}, locationId=${locationId}`);
-    
-    const user = await getUserById(userId);
-    if (!user) {
-      console.log('Benutzer nicht gefunden');
-      throw new Error('Benutzer nicht gefunden');
-    }
-    
-    console.log(`Benutzer gefunden: role=${user.role}`);
-    
-    let query = '';
-    
-    if (user.role === 'developer') {
-      // Developers see all buttons for the location
-      query = `
-        SELECT * FROM custom_buttons
-        WHERE location_id = $1
-        ORDER BY name`;
-      
-      console.log('Verwende Developer-Query');
-      const result = await pool.query(query, [locationId]);
-      console.log(`Developer-Query lieferte ${result.rows.length} Buttons`);
-      return result.rows;
-    } else {
-      // Other users see buttons based on their role or specific permissions
-      query = `
-        SELECT cb.* FROM custom_buttons cb
-        LEFT JOIN button_permissions bp ON cb.id = bp.button_id
-        WHERE cb.location_id = $1
-        AND (
-          bp.role = $2
-          OR bp.user_id = $3
-        )
-        ORDER BY cb.name`;
-      
-      console.log('Verwende Role-based Query');
-      console.log(`Parameter: locationId=${locationId}, role=${user.role}, userId=${userId}`);
-      const result = await pool.query(query, [locationId, user.role, userId]);
-      console.log(`Role-based Query lieferte ${result.rows.length} Buttons`);
-      return result.rows;
-    }
-  } catch (error) {
-    console.error(`Fehler beim Abrufen der Buttons für den Benutzer: ${error}`);
-    throw error;
   }
 };
 
