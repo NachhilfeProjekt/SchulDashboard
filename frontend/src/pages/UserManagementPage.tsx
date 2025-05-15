@@ -1,3 +1,4 @@
+// frontend/src/pages/UserManagementPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
@@ -70,8 +71,13 @@ const UserManagementPage: React.FC = () => {
         setActiveUsers(active);
       }
       
-      const deactivated = await getDeactivatedUsers();
-      setDeactivatedUsers(deactivated);
+      try {
+        const deactivated = await getDeactivatedUsers();
+        setDeactivatedUsers(deactivated);
+      } catch (error) {
+        console.error('Error fetching deactivated users:', error);
+        setDeactivatedUsers([]);
+      }
     } catch (error) {
       console.error('Error fetching users:', error);
       setError('Fehler beim Laden der Benutzerdaten.');
@@ -89,11 +95,16 @@ const UserManagementPage: React.FC = () => {
     setLoading(true);
     
     try {
-      const log = await getUserActivityLog(user.id);
-      setActivityLog(log);
+      try {
+        const log = await getUserActivityLog(user.id);
+        setActivityLog(log);
+      } catch (error) {
+        console.error('Error fetching activity log:', error);
+        setActivityLog([]);
+      }
       setActivityLogDialogOpen(true);
     } catch (error) {
-      console.error('Error fetching activity log:', error);
+      console.error('Error preparing activity log view:', error);
       setError('Fehler beim Laden des Aktivitätsprotokolls.');
     } finally {
       setLoading(false);
@@ -106,7 +117,8 @@ const UserManagementPage: React.FC = () => {
     setConfirmDialogOpen(true);
   };
 
-  const confirmAction = async () => {
+  // Umbenennung von confirmAction zu handleConfirmAction, um Kollision zu vermeiden
+  const handleConfirmAction = async () => {
     if (!selectedUser || !confirmAction) return;
     
     setActionLoading(selectedUser.id);
@@ -209,7 +221,7 @@ const UserManagementPage: React.FC = () => {
                         />
                       </TableCell>
                       <TableCell>
-                        {new Date(user.created_at).toLocaleDateString('de-DE')}
+                        {user.created_at ? new Date(user.created_at).toLocaleDateString('de-DE') : '-'}
                       </TableCell>
                       <TableCell align="right">
                         <IconButton 
@@ -363,7 +375,7 @@ const UserManagementPage: React.FC = () => {
           <Button
             variant="contained"
             color={confirmAction === 'reactivate' ? 'primary' : 'error'}
-            onClick={confirmAction}
+            onClick={handleConfirmAction} {/* Hier zur umbenannten Funktion ändern */}
             disabled={actionLoading !== null}
           >
             {confirmAction === 'reactivate' ? 'Reaktivieren' : 'Permanent löschen'}
