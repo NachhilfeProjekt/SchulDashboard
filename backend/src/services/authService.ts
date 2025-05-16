@@ -8,22 +8,20 @@ import pool from '../config/database';
 const JWT_SECRET = process.env.JWT_SECRET || 'default-secret';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1d';
 
-export const generateToken = (userId: string, role: UserRole, locations: string[]): string => {
+export const generateToken = (userId: string, role: UserRole, email: string, locations: string[]): string => {
   const payload = {
     userId,
+    email,
     role,
     locations
   };
   
-  console.log(`Generiere Token mit Payload:`, payload);
-  
   return jwt.sign(
-  payload,
-  JWT_SECRET as jwt.Secret,
-  { expiresIn: JWT_EXPIRES_IN }
-);
+    payload,
+    JWT_SECRET as jwt.Secret,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
 };
-
 export const sendPasswordResetEmail = async (email: string): Promise<boolean> => {
   try {
     const client = await pool.connect();
