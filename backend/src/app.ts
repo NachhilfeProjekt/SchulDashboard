@@ -52,6 +52,48 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Datenbank-Verbindungstest-Endpunkt
+app.get('/api/db-test', async (req, res) => {
+  try {
+    const client = await pool.connect();
+    const result = await client.query('SELECT NOW() as time');
+    client.release();
+    res.json({ 
+      status: 'success', 
+      message: 'Database connected', 
+      time: result.rows[0].time,
+      env: {
+        dbHost: process.env.DB_HOST,
+        dbName: process.env.DB_NAME,
+        dbPort: process.env.DB_PORT,
+        useSSL: process.env.DB_SSL
+      }
+    });
+  } catch (err) {
+    logger.error(`Database connection test failed: ${err.message}`);
+    res.status(500).json({ 
+      status: 'error', 
+      message: `Database connection failed: ${err.message}`,
+      stack: process.env.NODE_ENV === 'production' ? undefined : err.stack
+    });
+  }
+});
+
+// API-Tests-Endpunkt
+app.get('/api/test', async (req, res) => {
+  res.json({
+    message: 'API is working',
+    timestamp: new Date().toISOString(),
+    apiEndpoints: {
+      auth: '/api/auth',
+      users: '/api/users',
+      locations: '/api/locations',
+      buttons: '/api/buttons',
+      emails: '/api/emails'
+    }
+  });
+});
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -79,20 +121,33 @@ app.use(notFound);
 // Allgemeiner Fehlerhandler
 app.use(errorHandler);
 
-// Datenbank initialisieren, wenn INIT_DB Umgebungsvariable gesetzt ist
-if (process.env.INIT_DB === 'true') {
-  initializeDatabase()
-    .then(success => {
-      if (success) {
-        logger.info('Database initialization complete');
-      } else {
-        logger.error('Database initialization failed');
-      }
-    })
-    .catch(err => {
-      logger.error(`Unexpected error during database initialization: ${err}`);
-    });
-}
+// Datenbank initialisieren, entweder wenn INIT_DB=true oder wenn erste DB-Verbindung fehlschlägt
+(async function checkAndInitDatabase() {
+  try {
+    // Versuche Verbindung zur Datenbank
+    const client = await pool.connect();
+    logger.info('Initial database connection successful');
+    client.release();
+    
+    // Wenn INIT_DB gesetzt ist, initialisiere trotzdem
+    if (process.env.INIT_DB === 'true') {
+      logger.info('INIT_DB flag is set, initializing database...');
+      await initializeDatabase();
+    }
+  } catch (err) {
+    logger.error(`Initial database connection error: ${err.message}`);
+    
+    // Wenn die Verbindung fehlschlägt, versuche die Datenbank zu initialisieren
+    logger.info('Attempting database initialization due to connection failure...');
+    const success = await initializeDatabase();
+    
+    if (success) {
+      logger.info('Database initialization successful after connection failure');
+    } else {
+      logger.error('Database initialization failed, application may not function correctly');
+    }
+  }
+})();
 
 // Server starten
 const PORT = process.env.PORT || 10000;
