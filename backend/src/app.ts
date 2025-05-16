@@ -1,3 +1,4 @@
+// backend/src/app.ts
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -12,6 +13,7 @@ import dotenv from 'dotenv';
 import pool from './config/database';
 import logger from './config/logger';
 import { initializeDatabase } from './scripts/initDatabase';
+import setupCors from './cors-setup';
 
 // Lade Umgebungsvariablen
 dotenv.config();
@@ -26,8 +28,6 @@ app.use(helmet()); // Sicherheitsheader
 app.use(morgan('dev')); // Logging
 
 // CORS konfigurieren
-// Importiere CORS-Setup
-import setupCors from './cors-setup';
 setupCors(app);
 
 // Debugging-Middleware zum Loggen von Anfragen
@@ -41,9 +41,15 @@ app.get('/', (req, res) => {
   res.status(200).json({ status: 'OK', message: 'Server running' });
 });
 
-// Health-Check-Route
+// Health-Check-Route für Render
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', message: 'Server is running' });
+  res.status(200).json({ 
+    status: 'OK', 
+    message: 'Server is running',
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // API routes
@@ -62,17 +68,7 @@ if (process.env.NODE_ENV !== 'production' || process.env.DEBUG === 'true') {
       apiUrl: process.env.API_URL,
       frontendUrl: process.env.FRONTEND_URL,
       debug: process.env.DEBUG,
-      appMode: 'ES Modules',
-    });
-  });
-
-  app.get('/debug/login-test', (req, res) => {
-    res.json({
-      message: 'Login test route active',
-      loginTest: {
-        email: 'admin@example.com',
-        password: '[hidden]'
-      }
+      appMode: 'TypeScript Direct Execution'
     });
   });
 }
@@ -100,9 +96,10 @@ if (process.env.INIT_DB === 'true') {
 
 // Server starten
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   logger.info(`Server läuft auf Port ${PORT}`);
   logger.info(`Umgebung: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Server läuft auf Port ${PORT} (${process.env.NODE_ENV || 'development'})`);
 });
 
 export default app;
