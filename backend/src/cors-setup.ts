@@ -1,19 +1,18 @@
-// backend/src/cors-setup.js
-const cors = require("cors");
-const logger = require("./config/logger");
+// backend/src/cors-setup.ts
+import cors from 'cors';
+import logger from './config/logger';
 
-function setupCors(app) {
+function setupCors(app: any) {
   const allowedOrigins = [
     "https://dashboard-frontend-p693.onrender.com",
     "http://localhost:5173",
-    "http://localhost:3000",
-    // Füge weitere Domains nach Bedarf hinzu
+    "http://localhost:3000"
   ];
   
   logger.info('CORS konfiguriert für folgende Origins:', allowedOrigins);
   
   const corsOptions = {
-    origin: function(origin, callback) {
+    origin: function(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
       // Bei direkten API-Anfragen ist origin null
       if (!origin || allowedOrigins.includes(origin)) {
         logger.debug(`CORS: Zugriff erlaubt für Origin: ${origin || 'Direkte Anfrage'}`);
@@ -30,7 +29,7 @@ function setupCors(app) {
   };
   
   // Protokollierung von CORS-Anfragen aktivieren
-  app.use((req, res, next) => {
+  app.use((req: any, res: any, next: any) => {
     logger.debug(`CORS-Anfrage: ${req.method} ${req.url} von Origin: ${req.headers.origin || 'Direkte Anfrage'}`);
     next();
   });
@@ -39,8 +38,8 @@ function setupCors(app) {
   app.use(cors(corsOptions));
   
   // Fehlerbehandlung für CORS
-  app.use((err, req, res, next) => {
-    if (err.message.includes('CORS')) {
+  app.use((err: any, req: any, res: any, next: any) => {
+    if (err.message && err.message.includes('CORS')) {
       logger.warn(`CORS-Fehler: ${err.message}`);
       return res.status(403).json({ 
         message: 'CORS-Fehler: Zugriff von dieser Domain ist nicht erlaubt' 
@@ -50,4 +49,4 @@ function setupCors(app) {
   });
 }
 
-module.exports = setupCors;
+export default setupCors;
