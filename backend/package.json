@@ -7,9 +7,9 @@
     "start": "node dist/app.js",
     "build": "tsc",
     "dev": "ts-node-dev src/app.ts",
-    "build-render": "tsc --skipLibCheck && node fix-esm.js",
+    "build-render": "npx tsc --skipLibCheck",
     "clean": "rm -rf dist && mkdir -p dist",
-    "fix-esm": "node fix-esm.js"
+    "postinstall": "npm install typescript --no-save"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
