@@ -289,14 +289,13 @@ router.get('/current-user', authenticate, async (req, res) => {
     }
     
     // Benutzerdetails ohne sensitive Daten zurückgeben
-   const userDetails = {
+  const userDetails = {
   id: user.id,
   email: user.email,
   role: user.role,
   is_active: user.is_active,
-  // Hier entweder camelCase oder snake_case verwenden, je nachdem was in der Datenbank existiert
-  created_at: user.created_at || user.createdAt,
-  updated_at: user.updated_at || user.updatedAt
+  created_at: user.createdAt, // Korrigiert von created_at zu createdAt
+  updated_at: user.updatedAt  // Korrigiert von updated_at zu updatedAt
 };
     
     res.json({
