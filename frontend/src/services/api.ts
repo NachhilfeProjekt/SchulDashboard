@@ -50,60 +50,48 @@ export const checkApiConnection = async (): Promise<boolean> => {
   connectionStatus.lastOnlineCheck = now;
   
   try {
-    // Test-URLs (wir versuchen verschiedene Endpunkte)
-    const urls = [
-      `${API_URL}/test`,             // Standard API-Test
-      `${BASE_URL}/health`,          // Health-Check ohne /api
-      `${BASE_URL}/api/test`         // Expliziter Test-Pfad
-    ];
+    // Vereinfachte Verbindungsprüfung mit einem direkten Endpunkt
+    console.log("Prüfe Verbindung zum Backend...");
     
-    console.log("Überprüfe API-Verbindung mit folgenden URLs:", urls);
+    // Verwende nur einen Endpunkt für den Verbindungstest
+    const response = await fetch(`${BASE_URL}/health`, { 
+      method: 'HEAD',  // HEAD ist effizienter als GET für Verbindungstests
+      headers: { 'Cache-Control': 'no-cache' },
+      signal: AbortSignal.timeout(5000)  // 5 Sekunden Timeout
+    });
     
-    // Versuche jeden Endpunkt nacheinander
-    for (const url of urls) {
-      try {
-        console.log(`Versuche Verbindung zu: ${url}`);
-        const response = await fetch(url, { 
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          timeout: 5000
-        });
+    console.log(`Backend-Antwort: ${response.status}`);
+    
+    if (response.ok) {
+      console.log('✅ Erfolgreiche Verbindung zum Backend');
+      
+      if (connectionStatus.isOffline) {
+        console.log('Verbindung wiederhergestellt! Wechsle in Online-Modus.');
+        connectionStatus.isOffline = false;
+        connectionStatus.connectionAttempts = 0;
         
-        if (response.ok) {
-          console.log(`✅ Erfolgreiche Verbindung zu: ${url}`);
-          
-          if (connectionStatus.isOffline) {
-            console.log('API-Verbindung wiederhergestellt! Wechsle in Online-Modus.');
-            connectionStatus.isOffline = false;
-            connectionStatus.connectionAttempts = 0;
-            
-            // Lösche mögliche ausstehende Reconnect-Timer
-            if (connectionStatus.reconnectTimer) {
-              clearTimeout(connectionStatus.reconnectTimer);
-              connectionStatus.reconnectTimer = null;
-            }
-            
-            // Event auslösen
-            window.dispatchEvent(new CustomEvent(CONNECTION_CHANGE_EVENT, { 
-              detail: { isOffline: false } 
-            }));
-          }
-          
-          return true;
-        } else {
-          console.log(`❌ Verbindungsfehler zu: ${url} - Status: ${response.status}`);
+        // Lösche mögliche ausstehende Reconnect-Timer
+        if (connectionStatus.reconnectTimer) {
+          clearTimeout(connectionStatus.reconnectTimer);
+          connectionStatus.reconnectTimer = null;
         }
-      } catch (error) {
-        console.log(`❌ Verbindungsfehler zu: ${url} - ${error}`);
+        
+        // Event auslösen
+        window.dispatchEvent(new CustomEvent(CONNECTION_CHANGE_EVENT, { 
+          detail: { isOffline: false } 
+        }));
       }
+      
+      return true;
+    } else {
+      throw new Error(`Backend antwortet mit Status: ${response.status}`);
     }
-    
-    // Wenn wir hierher gelangen, haben alle Verbindungsversuche fehlgeschlagen
-    throw new Error("Alle API-Verbindungsversuche fehlgeschlagen");
   } catch (error) {
+    console.error("Verbindungsfehler:", error);
+    
     // Nur wenn wir nicht bereits im Offline-Modus sind, wechseln wir und benachrichtigen
     if (!connectionStatus.isOffline) {
-      console.warn('API nicht erreichbar. Wechsle in Offline-Modus.', error);
+      console.warn('Backend nicht erreichbar. Wechsle in Offline-Modus.');
       connectionStatus.isOffline = true;
       
       // Event auslösen
@@ -112,7 +100,7 @@ export const checkApiConnection = async (): Promise<boolean> => {
       }));
     }
     
-    // Planung des nächsten Verbindungsversuchs mit exponentiellem Backoff
+    // Planung des nächsten Verbindungsversuchs
     scheduleReconnect();
     
     return false;
@@ -161,8 +149,6 @@ startConnectionCheck();
 // Füge Logging für das API-URL hinzu
 console.log('BASE_URL:', BASE_URL);
 console.log('API_URL:', API_URL);
-
-// Rest der Datei bleibt unverändert...
 
 // Request Interceptor für das Hinzufügen des Tokens
 api.interceptors.request.use((config) => {
@@ -243,51 +229,262 @@ api.interceptors.response.use(
 // Timeout für API-Anfragen erhöhen
 api.defaults.timeout = 30000; // 30 Sekunden
 
-// Rest der Datei bleibt der gleiche wie zuvor...
+// FEHLENDE FUNKTIONEN HINZUFÜGEN
+// Diese Funktionen werden in der Anwendung importiert, aber nicht exportiert
 
-// UI-Komponente zur Anzeige des Verbindungsstatus registrieren
-document.addEventListener('DOMContentLoaded', () => {
-  const statusIndicator = document.createElement('div');
-  statusIndicator.id = 'connection-status-indicator';
-  statusIndicator.style.position = 'fixed';
-  statusIndicator.style.bottom = '10px';
-  statusIndicator.style.right = '10px';
-  statusIndicator.style.padding = '5px 10px';
-  statusIndicator.style.borderRadius = '4px';
-  statusIndicator.style.fontSize = '12px';
-  statusIndicator.style.fontWeight = 'bold';
-  statusIndicator.style.zIndex = '9999';
-  statusIndicator.style.cursor = 'pointer';
-  statusIndicator.style.transition = 'background-color 0.3s ease';
-  
-  const updateStatus = () => {
-    if (connectionStatus.isOffline) {
-      statusIndicator.textContent = 'Offline-Modus';
-      statusIndicator.style.backgroundColor = '#ff4d4f';
-      statusIndicator.style.color = 'white';
-    } else {
-      statusIndicator.textContent = 'Online';
-      statusIndicator.style.backgroundColor = '#52c41a';
-      statusIndicator.style.color = 'white';
-    }
-  };
-  
-  // Klick-Handler zum manuellen Umschalten
-  statusIndicator.addEventListener('click', () => {
-    toggleOfflineMode();
-    updateStatus();
-  });
-  
-  // Status-Änderungs-Listener
-  window.addEventListener(CONNECTION_CHANGE_EVENT, () => {
-    updateStatus();
-  });
-  
-  // Initial setzen
-  updateStatus();
-  
-  // Zum Dokument hinzufügen
-  document.body.appendChild(statusIndicator);
-});
+// Funktion zum Abrufen des aktuellen Benutzers
+export const getCurrentUser = async () => {
+  try {
+    const response = await api.get('/auth/me');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching current user:', error);
+    throw error;
+  }
+};
 
+// Funktion zum Abrufen der Standorte eines Benutzers
+export const getUserLocations = async () => {
+  try {
+    const response = await api.get('/users/locations');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching user locations:', error);
+    throw error;
+  }
+};
+
+// Weitere fehlende Funktionen
+export const getLocations = async () => {
+  try {
+    const response = await api.get('/locations');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching locations:', error);
+    throw error;
+  }
+};
+
+export const createLocation = async (name: string) => {
+  try {
+    const response = await api.post('/locations', { name });
+    return response.data;
+  } catch (error) {
+    console.error('Error creating location:', error);
+    throw error;
+  }
+};
+
+export const deleteLocation = async (id: string) => {
+  try {
+    const response = await api.delete(`/locations/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting location:', error);
+    throw error;
+  }
+};
+
+export const createUser = async (email: string, role: string, locationIds: string[]) => {
+  try {
+    const response = await api.post('/users', { email, role, locationIds });
+    return response.data;
+  } catch (error) {
+    console.error('Error creating user:', error);
+    throw error;
+  }
+};
+
+export const getButtonsForUser = async (locationId: string) => {
+  try {
+    const response = await api.get(`/buttons/location/${locationId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching buttons:', error);
+    throw error;
+  }
+};
+
+export const acceptLocationInvitation = async (token: string, password: string) => {
+  try {
+    const response = await api.post('/invitations/accept', { token, password });
+    return response.data;
+  } catch (error) {
+    console.error('Error accepting invitation:', error);
+    throw error;
+  }
+};
+
+export const getUsersByLocation = async (locationId: string) => {
+  try {
+    const response = await api.get(`/users/location/${locationId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching users by location:', error);
+    throw error;
+  }
+};
+
+export const deactivateUser = async (userId: string) => {
+  try {
+    const response = await api.post(`/users/${userId}/deactivate`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deactivating user:', error);
+    throw error;
+  }
+};
+
+export const deleteUser = async (userId: string) => {
+  try {
+    const response = await api.delete(`/users/${userId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    throw error;
+  }
+};
+
+export const getDeactivatedUsers = async () => {
+  try {
+    const response = await api.get('/users/deactivated');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching deactivated users:', error);
+    throw error;
+  }
+};
+
+export const reactivateUser = async (userId: string) => {
+  try {
+    const response = await api.post(`/users/${userId}/reactivate`);
+    return response.data;
+  } catch (error) {
+    console.error('Error reactivating user:', error);
+    throw error;
+  }
+};
+
+export const inviteUserToLocation = async (userId: string, locationId: string, role?: string) => {
+  try {
+    const data = role ? { userId, locationId, role } : { userId, locationId };
+    const response = await api.post('/invitations', data);
+    return response.data;
+  } catch (error) {
+    console.error('Error inviting user to location:', error);
+    throw error;
+  }
+};
+
+export const getAllUsers = async () => {
+  try {
+    const response = await api.get('/users');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching all users:', error);
+    throw error;
+  }
+};
+
+export const createCustomButton = async (name: string, url: string, locationId: string) => {
+  try {
+    const response = await api.post('/buttons', { name, url, locationId });
+    return response.data;
+  } catch (error) {
+    console.error('Error creating button:', error);
+    throw error;
+  }
+};
+
+export const setButtonPermissions = async (buttonId: string, permissions: any) => {
+  try {
+    const response = await api.post(`/buttons/${buttonId}/permissions`, permissions);
+    return response.data;
+  } catch (error) {
+    console.error('Error setting button permissions:', error);
+    throw error;
+  }
+};
+
+export const deleteButton = async (buttonId: string) => {
+  try {
+    const response = await api.delete(`/buttons/${buttonId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting button:', error);
+    throw error;
+  }
+};
+
+export const getEmailTemplates = async (locationId: string) => {
+  try {
+    const response = await api.get(`/email-templates/location/${locationId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching email templates:', error);
+    throw error;
+  }
+};
+
+export const sendBulkEmails = async (templateId: string, recipients: any[]) => {
+  try {
+    const response = await api.post('/emails/bulk', { templateId, recipients });
+    return response.data;
+  } catch (error) {
+    console.error('Error sending bulk emails:', error);
+    throw error;
+  }
+};
+
+export const getSentEmails = async (locationId: string) => {
+  try {
+    const response = await api.get(`/emails/sent/location/${locationId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching sent emails:', error);
+    throw error;
+  }
+};
+
+export const resendFailedEmails = async (emailIds: string[]) => {
+  try {
+    const response = await api.post('/emails/resend', { emailIds });
+    return response.data;
+  } catch (error) {
+    console.error('Error resending failed emails:', error);
+    throw error;
+  }
+};
+
+export const getUserActivityLog = async (userId: string) => {
+  try {
+    const response = await api.get(`/users/${userId}/activity-log`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching user activity log:', error);
+    throw error;
+  }
+};
+
+export const requestPasswordReset = async (email: string) => {
+  try {
+    const response = await api.post('/auth/request-password-reset', { email });
+    return response.data;
+  } catch (error) {
+    console.error('Error requesting password reset:', error);
+    throw error;
+  }
+};
+
+export const resetPassword = async (token: string, newPassword: string) => {
+  try {
+    const response = await api.post('/auth/reset-password', { token, newPassword });
+    return response.data;
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    throw error;
+  }
+};
+
+// API-Instanz exportieren
 export default api;
