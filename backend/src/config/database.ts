@@ -31,6 +31,36 @@ pool.on('error', (err: Error) => {
   logger.error(`Unexpected error on idle client: ${err.message}`);
 });
 
+// Globaler Status für Datenbankverbindung
+let dbStatus = {
+  isConnected: false,
+  lastConnectionAttempt: 0,
+  connectionAttempts: 0
+};
+
+// Verbindungsmonitor
+setInterval(async () => {
+  // Nur versuchen, wenn nicht verbunden oder letzte Verbindung vor mehr als 60 Sekunden
+  const now = Date.now();
+  if (!dbStatus.isConnected || now - dbStatus.lastConnectionAttempt > 60000) {
+    dbStatus.lastConnectionAttempt = now;
+    
+    try {
+      const client = await pool.connect();
+      if (!dbStatus.isConnected) {
+        logger.info('Datenbankverbindung wiederhergestellt');
+      }
+      dbStatus.isConnected = true;
+      dbStatus.connectionAttempts = 0;
+      client.release();
+    } catch (err) {
+      dbStatus.isConnected = false;
+      dbStatus.connectionAttempts++;
+      logger.error(`Datenbankverbindungsfehler (Versuch ${dbStatus.connectionAttempts}): ${err.message}`);
+    }
+  }
+}, 10000); // Alle 10 Sekunden prüfen
+
 // Test der Datenbankverbindung
 const testDatabase = async () => {
   let client;
@@ -69,4 +99,6 @@ testDatabase().then(success => {
   }
 });
 
+// Exportiere Pool und Status
 export default pool;
+export { dbStatus };
