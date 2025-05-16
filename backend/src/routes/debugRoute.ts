@@ -195,27 +195,4 @@ router.get('/fix-relations', async (req, res) => {
     // Jetzt prüfen wir die Inhalte der Tabellen
     const usersCount = await pool.query('SELECT COUNT(*) FROM users');
     const locationsCount = await pool.query('SELECT COUNT(*) FROM locations');
-    const userLocationsCount = await pool.query('SELECT COUNT(*) FROM user_locations');
-    const buttonsCount = await pool.query('SELECT COUNT(*) FROM custom_buttons');
-    const buttonPermissionsCount = await pool.query('SELECT COUNT(*) FROM button_permissions');
-    
-    res.json({
-      message: 'Datenbank-Tabellen überprüft',
-      tables,
-      counts: {
-        users: parseInt(usersCount.rows[0].count),
-        locations: parseInt(locationsCount.rows[0].count),
-        userLocations: parseInt(userLocationsCount.rows[0].count),
-        buttons: parseInt(buttonsCount.rows[0].count),
-        buttonPermissions: parseInt(buttonPermissionsCount.rows[0].count)
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: 'Fehler beim Überprüfen der Datenbank-Relationen',
-      error: error.message
-    });
-  }
-});
-
-export default router;
+    const userLocatio
