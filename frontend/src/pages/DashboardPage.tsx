@@ -19,9 +19,13 @@ const DashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [buttons, setButtons] = useState<any[]>([]);
+  const [fetchAttempts, setFetchAttempts] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Vermeiden von endlosen API-Anfragen
+    if (fetchAttempts > 2) return;
+    
     if (user && currentLocation) {
       console.log('Dashboard: User und Standort vorhanden', user);
       const loadButtons = async () => {
@@ -32,7 +36,8 @@ const DashboardPage: React.FC = () => {
           setButtons(buttonsData);
         } catch (err) {
           console.error('Fehler beim Abrufen der Buttons:', err);
-          setError('Fehler beim Laden der Buttons. Bitte versuchen Sie es später erneut.');
+          setError('Fehler beim Laden der Buttons. Offline-Modus ist aktiv.');
+          setFetchAttempts(prev => prev + 1);
         } finally {
           setLoading(false);
         }
@@ -40,7 +45,7 @@ const DashboardPage: React.FC = () => {
 
       loadButtons();
     }
-  }, [user, currentLocation]);
+  }, [user, currentLocation, fetchAttempts]);
 
   const getIconByName = (iconName: string) => {
     switch (iconName) {
@@ -65,7 +70,7 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (loading && fetchAttempts === 0) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
         <CircularProgress />
