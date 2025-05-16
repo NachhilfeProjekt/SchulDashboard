@@ -1,104 +1,43 @@
 #!/bin/bash
 
-# Sicherstellen, dass benötigte Tools installiert sind
-npm install -g typescript rimraf
-
-# Notwendige Abhängigkeiten installieren
-npm install --production=false
-
 # Bereinige das dist-Verzeichnis
 rm -rf dist
 mkdir -p dist
 
 # Stelle sicher, dass alle nötigen Verzeichnisse existieren
-mkdir -p src/validation logs
+mkdir -p logs
 
-# Konvertiere cors-setup.js zu TypeScript, falls noch nicht vorhanden
-if [ -f src/cors-setup.js ] && [ ! -f src/cors-setup.ts ]; then
-  echo 'import cors from "cors";
-import logger from "./config/logger";
+# Kopiere alle Dateien in den dist-Ordner
+cp -R src/* dist/
 
-function setupCors(app: any) {
-  const allowedOrigins = [
-    "https://dashboard-frontend-p693.onrender.com",
-    "http://localhost:5173",
-    "http://localhost:3000"
-  ];
-
-  const corsOptions = {
-    origin: function(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        logger.debug(`CORS: Zugriff erlaubt für Origin: ${origin || "Direkte Anfrage"}`);
-        callback(null, true);
-      } else {
-        logger.warn(`CORS: Zugriff verweigert für Origin: ${origin}`);
-        callback(new Error("CORS policy violation: Origin not allowed"), false);
-      }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-    credentials: true,
-    maxAge: 86400
-  };
-
-  app.use((req: any, res: any, next: any) => {
-    logger.debug(`CORS-Anfrage: ${req.method} ${req.url} von Origin: ${req.headers.origin || "Direkte Anfrage"}`);
-    next();
-  });
-
-  app.use(cors(corsOptions));
-
-  app.use((err: any, req: any, res: any, next: any) => {
-    if (err.message && err.message.includes("CORS")) {
-      logger.warn(`CORS-Fehler: ${err.message}`);
-      return res.status(403).json({ 
-        message: "CORS-Fehler: Zugriff von dieser Domain ist nicht erlaubt" 
-      });
-    }
-    next(err);
-  });
-}
-
-export default setupCors;' > src/cors-setup.ts
-  rm src/cors-setup.js
-fi
-
-# Kompilieren mit TypeScript
-echo "Kompiliere TypeScript..."
-npx tsc --skipLibCheck
-
-# Erfolg überprüfen
-if [ $? -ne 0 ]; then
-  echo "TypeScript-Kompilierung fehlgeschlagen, versuche Fallback-Methode..."
+# Konvertiere TypeScript-Dateien in JavaScript
+echo "Konvertiere TypeScript zu JavaScript..."
+find dist -name "*.ts" -type f | while read file; do
+  js_file="${file%.ts}.js"
   
-  # Fallback: Manuell kopieren und konvertieren
-  cp -R src/* dist/
+  echo "Konvertiere: $file zu $js_file"
   
-  # TypeScript-Dateien zu JavaScript konvertieren
-  find dist -name "*.ts" | while read file; do
-    js_file="${file%.ts}.js"
-    
-    # Konvertiere mit Node.js für bessere Zuverlässigkeit
-    node -e "
-      const fs = require('fs');
-      let content = fs.readFileSync('$file', 'utf8');
-      
-      // Import-Deklarationen konvertieren
-      content = content.replace(/import ([^{]+) from ['\\\"]([^'\\\"]+)['\\\"];?/g, 'const \$1 = require(\"\$2\");');
-      content = content.replace(/import \\{ ([^}]+) \\} from ['\\\"]([^'\\\"]+)['\\\"];?/g, 'const { \$1 } = require(\"\$2\");');
-      content = content.replace(/export const/g, 'exports.');
-      content = content.replace(/export default/g, 'module.exports =');
-      
-      // Typdefinitionen entfernen
-      content = content.replace(/: [A-Za-z<>\\[\\](){}|&]+/g, '');
-      content = content.replace(/\\?: [A-Za-z<>\\[\\](){}|&]+/g, '');
-      
-      fs.writeFileSync('$js_file', content);
-      fs.unlinkSync('$file');
-    "
-  done
+  # Erstelle eine temporäre Datei
+  temp_file=$(mktemp)
   
-  echo "Fallback-Konvertierung abgeschlossen."
-fi
+  # Schrittweise Transformation mit expliziten Patterns
+  # 1. Import-Anweisungen konvertieren
+  sed -E 's/import ([a-zA-Z0-9_]+) from ["'\''"]([^"'\''"]*)["'\''"]/const \1 = require("\2")/' "$file" > "$temp_file"
+  
+  # 2. Import mit geschwungenen Klammern konvertieren
+  sed -E 's/import \{ ([^}]*) \} from ["'\''"]([^"'\''"]*)["'\''"]|")/const { \1 } = require("\2")/' "$temp_file" > "$js_file"
+  
+  # 3. Export-Anweisungen konvertieren
+  sed -E -i 's/export default ([^;]*);?/module.exports = \1;/' "$js_file"
+  sed -E -i 's/export const ([a-zA-Z0-9_]+)/exports.\1/' "$js_file"
+  
+  # 4. TypeScript-Typen entfernen (einfache Fälle)
+  sed -E -i 's/: [a-zA-Z0-9_<>\[\]\(\)\{\}\|&]+//g' "$js_file"
+  sed -E -i 's/\?: [a-zA-Z0-9_<>\[\]\(\)\{\}\|&]+//g' "$js_file"
+  
+  # Bereinige
+  rm "$temp_file"
+  rm "$file"
+done
 
 echo "Build abgeschlossen!"
