@@ -145,4 +145,41 @@ router.post('/create-user', validate(createUserSchema), async (req, res) => {
   }
 });
 
+// Aktualisierte Route für Password-Reset
+router.post('/reset-password', validate(passwordResetSchema), async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    const success = await resetPassword(token, newPassword);
+    
+    if (success) {
+      // Protokolliere die Passwortänderung
+      try {
+        const userResult = await pool.query(
+          'SELECT id FROM users WHERE temporary_token = $1',
+          [token]
+        );
+        
+        if (userResult.rows.length > 0) {
+          const userId = userResult.rows[0].id;
+          
+          await pool.query(
+            'INSERT INTO user_activity_log (user_id, action, details) VALUES ($1, $2, $3)',
+            [userId, 'password_reset', JSON.stringify({ method: 'reset_token' })]
+          );
+        }
+      } catch (logError) {
+        console.error('Error logging password reset:', logError);
+        // Fehler bei der Protokollierung sollten den Erfolg nicht beeinflussen
+      }
+      
+      res.json({ message: 'Passwort erfolgreich zurückgesetzt. Sie können sich jetzt anmelden.' });
+    } else {
+      res.status(400).json({ message: 'Ungültiger oder abgelaufener Token.' });
+    }
+  } catch (error) {
+    console.error(`Fehler beim Zurücksetzen des Passworts: ${error}`);
+    res.status(500).json({ message: 'Fehler beim Zurücksetzen des Passworts.' });
+  }
+});
+
 export default router;
