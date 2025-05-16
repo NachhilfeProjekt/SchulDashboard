@@ -36,6 +36,18 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
     logger.debug(`Token erfolgreich verifiziert für Benutzer-ID: ${decoded.userId}`);
     req.user = decoded;
     next();
+    declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        userId: string;
+        role: UserRole;
+        locations: string[];
+        email?: string; // Füge email hinzu
+      };
+    }
+  }
+}
   } catch (error) {
     logger.error(`Token-Verifizierung fehlgeschlagen: ${error}`);
     res.status(401).json({ message: 'Ungültiger Token' });
