@@ -210,6 +210,48 @@ export interface ApiError {
   };
 }
 
+// Erweitern Sie die Typen in /frontend/src/types.ts
+
+export interface User {
+  id: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  deactivated_at?: string;
+  locations?: Location[];
+}
+
+export interface Location {
+  id: string;
+  name: string;
+  created_at?: string;
+  created_by?: string;
+}
+
+export interface SentEmail {
+  id: string;
+  recipient_email: string;
+  recipient_name: string;
+  template_id?: string;
+  sender: string;
+  subject: string;
+  body: string;
+  status: 'sent' | 'failed' | 'resent';
+  location_id: string;
+  sent_at: string;
+}
+
+export interface CustomButton {
+  id: string;
+  name: string;
+  url: string;
+  location_id: string;
+  created_by: string;
+  created_at: string;
+}
+
 // Einstellungen
 export interface Settings {
   companyName: string;
