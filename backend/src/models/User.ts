@@ -756,8 +756,65 @@ export const inviteUserToLocation = async (userId: string, locationId: string): 
     
     return true;
   } catch (error) {
-    await
-  };
+    // Fortsetzung der inviteUserToLocation-Funktion
+    await client.query('ROLLBACK');
+    logger.error(`Fehler beim Einladen des Benutzers: ${error}`);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+// Funktion für die Einladungs-E-Mail
+export const sendInvitationEmail = async (email: string, locationName: string): Promise<void> => {
+  const invitationLink = `${process.env.FRONTEND_URL}/login`;
+  
+  await sendEmail({
+    to: email,
+    from: process.env.EMAIL_FROM || 'noreply@example.com',
+    subject: `Einladung zum Standort ${locationName}`,
+    text: `Sie wurden zum Standort "${locationName}" eingeladen. Bitte melden Sie sich an unter: ${invitationLink}`,
+    html: `
+      <p>Hallo,</p>
+      <p>Sie wurden zum Standort <strong>"${locationName}"</strong> eingeladen.</p>
+      <p>Bitte melden Sie sich an unter: <a href="${invitationLink}">${invitationLink}</a></p>
+      <p>Mit freundlichen Grüßen,<br>Ihr Dashboard-Team</p>
+    `
+  });
+};
+
+// Alle Benutzer abrufen (für Einladungen)
+export const getAllUsers = async (): Promise<User[]> => {
+  try {
+    const result = await pool.query(`
+      SELECT u.*, array_agg(l.id) as location_ids, array_agg(l.name) as location_names
+      FROM users u
+      LEFT JOIN user_locations ul ON u.id = ul.user_id
+      LEFT JOIN locations l ON ul.location_id = l.id
+      GROUP BY u.id
+      ORDER BY u.email
+    `);
+    
+    // Format the results to include locations as objects
+    return result.rows.map(user => {
+      const locations = user.location_ids.map((id, index) => ({
+        id: id,
+        name: user.location_names[index]
+      })).filter(loc => loc.id !== null);
+      
+      return {
+        ...user,
+        locations,
+        location_ids: undefined,
+        location_names: undefined
+      };
+    });
+  } catch (error) {
+    logger.error(`Fehler beim Abrufen aller Benutzer: ${error}`);
+    throw error;
+  }
+};
+  
 
 export const UserModel = {
   createUser,
