@@ -1,62 +1,82 @@
 // backend/src/app.ts
 import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
 import morgan from 'morgan';
+import helmet from 'helmet';
+import cors from 'cors';
 import dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 import locationRoutes from './routes/locationRoutes';
-import buttonRoutes from './routes/buttonRoutes';
-import emailRoutes from './routes/emailRoutes';
-import debugRoute from './routes/debugRoute';
-import { notFound, errorHandler } from './middleware/errorMiddleware';
-import logger from './config/logger';
-import pool from './config/database';
+import dashboardRoutes from './routes/dashboardRoutes';
 
 // Lade Umgebungsvariablen
 dotenv.config();
 
-// Initialisiere Express App
+// App initialisieren
 const app = express();
-const PORT = process.env.PORT || 3000;
+
+// CORS-Konfiguration
+const allowedOrigins = [
+  'https://dashboard-frontend-p693.onrender.com',
+  'http://localhost:5173', // Für lokale Entwicklung
+  'http://localhost:3000'  // Für lokale Entwicklung
+];
+
+const corsOptions = {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    // Wenn kein Origin-Header (z.B. bei direkten Aufrufen) oder der Origin ist in der Liste
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS policy violation: Origin not allowed'), false);
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  maxAge: 86400 // 24 Stunden in Sekunden
+};
 
 // Middleware
-app.use(cors());
-app.use(helmet());
+app.use(cors(corsOptions));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
+app.use(helmet({
+  contentSecurityPolicy: false, // Deaktivieren für einfacheres Setup, in Produktion anpassen
+}));
 
-// Health Check Endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// Supabase initialisieren (falls verwendet)
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_KEY || '';
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Routen
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/locations', locationRoutes);
-app.use('/api/buttons', buttonRoutes);
-app.use('/api/emails', emailRoutes);
-app.use('/api/debug', debugRoute);
+app.use('/api/dashboard', dashboardRoutes);
 
-// Error Handling
-app.use(notFound);
-app.use(errorHandler);
-
-// Starte Server
-app.listen(PORT, () => {
-  logger.info(`Server läuft auf Port ${PORT}`);
-  logger.info(`Umgebung: ${process.env.NODE_ENV || 'development'}`);
+// Fallback-Route
+app.use('*', (req, res) => {
+  res.status(404).json({ message: 'Route not found' });
 });
 
-// Handle Graceful Shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM Signal erhalten. Server wird heruntergefahren.');
-  pool.end().then(() => {
-    logger.info('Datenbankverbindungen geschlossen');
-    process.exit(0);
+// Error-Handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error(err.stack);
+  res.status(err.status || 500).json({
+    message: err.message || 'Internal Server Error',
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
   });
+});
+
+// Server starten
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server läuft auf Port ${PORT}`);
+  console.log(`Umgebung: ${process.env.NODE_ENV || 'development'}`);
 });
 
 export default app;
