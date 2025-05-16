@@ -14,6 +14,7 @@ import pool from './config/database';
 import logger from './config/logger';
 import { initializeDatabase } from './scripts/initDatabase';
 import setupCors from './cors-setup';
+import debugRoutes from './routes/debugRoute';
 
 // Lade Umgebungsvariablen
 dotenv.config();
@@ -100,6 +101,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/buttons', buttonRoutes);
 app.use('/api/emails', emailRoutes);
+app.use('/api/debug', debugRoutes); // Debug-Routen hinzufügen
 
 // Debug-Routes
 if (process.env.NODE_ENV !== 'production' || process.env.DEBUG === 'true') {
