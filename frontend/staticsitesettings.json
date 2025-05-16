@@ -1,6 +1,15 @@
 {
   "routes": [
     {
+      "route": "/api/*",
+      "headers": {
+        "X-Proxy-Target": "https://dashboard-backend-uweg.onrender.com/api"
+      },
+      "proxy": {
+        "target": "https://dashboard-backend-uweg.onrender.com/api/:splat"
+      }
+    },
+    {
       "route": "/*",
       "serve": "/index.html",
       "status": 200
