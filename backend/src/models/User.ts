@@ -58,10 +58,10 @@ export const createUser = async (email: string, password: string, role: string, 
   const hashedPassword = await bcrypt.hash(password, 10);
   const userId = uuidv4();
   const client = await pool.connect();
-
+  
   try {
     await client.query('BEGIN');
-
+    
     const userQuery = `
       INSERT INTO users (id, email, password, role, created_by, is_active)
       VALUES ($1, $2, $3, $4, $5, true)
@@ -69,15 +69,22 @@ export const createUser = async (email: string, password: string, role: string, 
     const userValues = [userId, email, hashedPassword, role, createdBy];
     const userResult = await client.query(userQuery, userValues);
     const user = userResult.rows[0];
-
+    
     for (const locationId of locations) {
       const locationQuery = `
         INSERT INTO user_locations (user_id, location_id)
         VALUES ($1, $2)`;
       await client.query(locationQuery, [userId, locationId]);
     }
-
+    
+    // Protokolliere die Benutzererstelling
+    await client.query(
+      'INSERT INTO user_activity_log (user_id, action, performed_by, details) VALUES ($1, $2, $3, $4)',
+      [userId, 'created', createdBy, JSON.stringify({ role, locations })]
+    );
+    
     await client.query('COMMIT');
+    logger.info(`Benutzer ${email} erfolgreich erstellt mit ID: ${userId}`);
     return user;
   } catch (error) {
     await client.query('ROLLBACK');
@@ -114,7 +121,6 @@ export const getUsersByLocation = async (locationId: string): Promise<User[]> =>
       SELECT u.* FROM users u
       JOIN user_locations ul ON u.id = ul.user_id
       WHERE ul.location_id = $1 AND u.is_active = true`;
-    
     const result = await pool.query(query, [locationId]);
     return result.rows;
   } catch (error) {
@@ -129,7 +135,6 @@ export const getUserLocations = async (userId: string): Promise<Location[]> => {
       SELECT l.* FROM locations l
       JOIN user_locations ul ON l.id = ul.location_id
       WHERE ul.user_id = $1`;
-    
     const result = await pool.query(query, [userId]);
     return result.rows;
   } catch (error) {
@@ -154,8 +159,8 @@ export const createLocation = async (name: string, createdBy: string): Promise<L
       INSERT INTO locations (name, created_by)
       VALUES ($1, $2)
       RETURNING *`;
-    
     const result = await pool.query(query, [name, createdBy]);
+    logger.info(`Standort "${name}" erfolgreich erstellt mit ID: ${result.rows[0].id}`);
     return result.rows[0];
   } catch (error) {
     logger.error(`Fehler beim Erstellen des Standorts: ${error}`);
@@ -172,12 +177,13 @@ export const createTemporaryToken = async (email: string): Promise<string> => {
     const token = uuidv4();
     const expires = new Date();
     expires.setHours(expires.getHours() + 1);
-
+    
     await pool.query(
       'UPDATE users SET temporary_token = $1, temporary_token_expires = $2 WHERE email = $3',
       [token, expires, email]
     );
-
+    
+    logger.info(`Temporärer Token erstellt für E-Mail: ${email}`);
     return token;
   } catch (error) {
     logger.error(`Fehler beim Erstellen des temporären Tokens: ${error}`);
@@ -186,38 +192,58 @@ export const createTemporaryToken = async (email: string): Promise<string> => {
 };
 
 export const resetPassword = async (token: string, newPassword: string): Promise<boolean> => {
+  const client = await pool.connect();
+  
   try {
-    const userResult = await pool.query(
+    await client.query('BEGIN');
+    
+    const userResult = await client.query(
       'SELECT * FROM users WHERE temporary_token = $1 AND temporary_token_expires > NOW()',
       [token]
     );
-
-    if (!userResult.rows[0]) return false;
-
+    
+    if (!userResult.rows[0]) {
+      logger.warn(`Passwort-Zurücksetzung fehlgeschlagen: Ungültiger oder abgelaufener Token`);
+      return false;
+    }
+    
+    const userId = userResult.rows[0].id;
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await pool.query(
-      'UPDATE users SET password = $1, temporary_token = NULL, temporary_token_expires = NULL WHERE id = $2',
-      [hashedPassword, userResult.rows[0].id]
+    
+    await client.query(
+      'UPDATE users SET password = $1, temporary_token = NULL, temporary_token_expires = NULL, updated_at = NOW() WHERE id = $2',
+      [hashedPassword, userId]
     );
-
+    
+    // Protokolliere die Passwortänderung
+    await client.query(
+      'INSERT INTO user_activity_log (user_id, action, details) VALUES ($1, $2, $3)',
+      [userId, 'password_reset', JSON.stringify({ method: 'reset_token' })]
+    );
+    
+    await client.query('COMMIT');
+    logger.info(`Passwort erfolgreich zurückgesetzt für Benutzer-ID: ${userId}`);
     return true;
   } catch (error) {
+    await client.query('ROLLBACK');
     logger.error(`Fehler beim Zurücksetzen des Passworts: ${error}`);
     throw error;
+  } finally {
+    client.release();
   }
 };
 
 export const getButtonsForUser = async (userId: string, locationId: string): Promise<CustomButton[]> => {
   try {
-    console.log(`getButtonsForUser aufgerufen mit userId=${userId}, locationId=${locationId}`);
+    logger.debug(`getButtonsForUser aufgerufen mit userId=${userId}, locationId=${locationId}`);
     
     const user = await getUserById(userId);
     if (!user) {
-      console.log('Benutzer nicht gefunden');
+      logger.warn('Benutzer nicht gefunden');
       throw new Error('Benutzer nicht gefunden');
     }
     
-    console.log(`Benutzer gefunden: role=${user.role}`);
+    logger.debug(`Benutzer gefunden: role=${user.role}`);
     
     let query = '';
     
@@ -228,13 +254,14 @@ export const getButtonsForUser = async (userId: string, locationId: string): Pro
         WHERE location_id = $1
         ORDER BY name`;
       
-      console.log('Verwende Developer-Query');
+      logger.debug('Verwende Developer-Query');
       const result = await pool.query(query, [locationId]);
-      console.log(`Developer-Query lieferte ${result.rows.length} Buttons`);
+      logger.debug(`Developer-Query lieferte ${result.rows.length} Buttons`);
       
       // Wenn keine Buttons gefunden wurden, füge einen Test-Button hinzu
       if (result.rows.length === 0) {
-        console.log('Keine Buttons gefunden, erstelle Test-Button');
+        logger.info('Keine Buttons gefunden, erstelle Test-Button');
+        
         try {
           const insertResult = await pool.query(`
             INSERT INTO custom_buttons (name, url, location_id, created_by)
@@ -248,10 +275,10 @@ export const getButtonsForUser = async (userId: string, locationId: string): Pro
             VALUES ($1, 'developer'), ($1, 'lead'), ($1, 'office'), ($1, 'teacher')
           `, [insertResult.rows[0].id]);
           
-          console.log('Test-Button erstellt:', insertResult.rows[0]);
+          logger.info('Test-Button erstellt:', insertResult.rows[0]);
           return [insertResult.rows[0]];
         } catch (err) {
-          console.error('Fehler beim Erstellen des Test-Buttons:', err);
+          logger.error('Fehler beim Erstellen des Test-Buttons:', err);
         }
       }
       
@@ -259,7 +286,7 @@ export const getButtonsForUser = async (userId: string, locationId: string): Pro
     } else {
       // Other users see buttons based on their role or specific permissions
       query = `
-        SELECT cb.* FROM custom_buttons cb
+        SELECT DISTINCT cb.* FROM custom_buttons cb
         LEFT JOIN button_permissions bp ON cb.id = bp.button_id
         WHERE cb.location_id = $1
         AND (
@@ -268,30 +295,49 @@ export const getButtonsForUser = async (userId: string, locationId: string): Pro
         )
         ORDER BY cb.name`;
       
-      console.log('Verwende Role-based Query');
-      console.log(`Parameter: locationId=${locationId}, role=${user.role}, userId=${userId}`);
+      logger.debug('Verwende Role-based Query');
+      logger.debug(`Parameter: locationId=${locationId}, role=${user.role}, userId=${userId}`);
       const result = await pool.query(query, [locationId, user.role, userId]);
-      console.log(`Role-based Query lieferte ${result.rows.length} Buttons`);
+      logger.debug(`Role-based Query lieferte ${result.rows.length} Buttons`);
       return result.rows;
     }
   } catch (error) {
-    console.error(`Fehler beim Abrufen der Buttons für den Benutzer: ${error}`);
+    logger.error(`Fehler beim Abrufen der Buttons für den Benutzer: ${error}`);
     throw error;
   }
 };
 
 export const createCustomButton = async (name: string, url: string, locationId: string, createdBy: string): Promise<CustomButton> => {
+  const client = await pool.connect();
+  
   try {
+    await client.query('BEGIN');
+    
     const query = `
       INSERT INTO custom_buttons (name, url, location_id, created_by)
       VALUES ($1, $2, $3, $4)
       RETURNING *`;
+    const result = await client.query(query, [name, url, locationId, createdBy]);
     
-    const result = await pool.query(query, [name, url, locationId, createdBy]);
+    // Füge eine Log-Eintrag hinzu
+    await client.query(
+      'INSERT INTO user_activity_log (user_id, action, performed_by, details) VALUES ($1, $2, $3, $4)',
+      [createdBy, 'button_created', createdBy, JSON.stringify({ 
+        button_id: result.rows[0].id,
+        button_name: name,
+        location_id: locationId
+      })]
+    );
+    
+    await client.query('COMMIT');
+    logger.info(`Button "${name}" erfolgreich erstellt für Standort ${locationId}`);
     return result.rows[0];
   } catch (error) {
+    await client.query('ROLLBACK');
     logger.error(`Fehler beim Erstellen des Buttons: ${error}`);
     throw error;
+  } finally {
+    client.release();
   }
 };
 
@@ -325,6 +371,7 @@ export const setButtonPermissions = async (buttonId: string, permissions: { role
     }
     
     await client.query('COMMIT');
+    logger.info(`Berechtigungen für Button ${buttonId} aktualisiert: ${JSON.stringify(permissions)}`);
   } catch (error) {
     await client.query('ROLLBACK');
     logger.error(`Fehler beim Setzen der Button-Berechtigungen: ${error}`);
@@ -340,7 +387,6 @@ export const getEmailTemplates = async (locationId: string): Promise<EmailTempla
       SELECT * FROM email_templates
       WHERE location_id = $1
       ORDER BY name`;
-    
     const result = await pool.query(query, [locationId]);
     return result.rows;
   } catch (error) {
@@ -356,26 +402,52 @@ export const createEmailTemplate = async (
   locationId: string,
   createdBy: string
 ): Promise<EmailTemplate> => {
+  const client = await pool.connect();
+  
   try {
+    await client.query('BEGIN');
+    
     const query = `
       INSERT INTO email_templates (name, subject, body, location_id, created_by)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *`;
+    const result = await client.query(query, [name, subject, body, locationId, createdBy]);
     
-    const result = await pool.query(query, [name, subject, body, locationId, createdBy]);
+    // Aktivität protokollieren
+    await client.query(
+      'INSERT INTO user_activity_log (user_id, action, performed_by, details) VALUES ($1, $2, $3, $4)',
+      [createdBy, 'email_template_created', createdBy, JSON.stringify({ 
+        template_id: result.rows[0].id,
+        template_name: name,
+        location_id: locationId
+      })]
+    );
+    
+    await client.query('COMMIT');
+    logger.info(`E-Mail-Vorlage "${name}" erfolgreich erstellt für Standort ${locationId}`);
     return result.rows[0];
   } catch (error) {
+    await client.query('ROLLBACK');
     logger.error(`Fehler beim Erstellen der E-Mail-Vorlage: ${error}`);
     throw error;
+  } finally {
+    client.release();
   }
 };
 
-// Füge diese Funktion zum Löschen von Buttons hinzu
+// Button löschen
 export const deleteButton = async (buttonId: string): Promise<void> => {
   const client = await pool.connect();
   
   try {
     await client.query('BEGIN');
+    
+    // Button-Informationen vor dem Löschen abrufen (für Logging)
+    const buttonInfo = await client.query('SELECT * FROM custom_buttons WHERE id = $1', [buttonId]);
+    
+    if (buttonInfo.rows.length === 0) {
+      throw new Error('Button nicht gefunden');
+    }
     
     // Lösche zuerst die Berechtigungen
     await client.query('DELETE FROM button_permissions WHERE button_id = $1', [buttonId]);
@@ -383,7 +455,18 @@ export const deleteButton = async (buttonId: string): Promise<void> => {
     // Lösche dann den Button
     await client.query('DELETE FROM custom_buttons WHERE id = $1', [buttonId]);
     
+    // Aktivität protokollieren
+    await client.query(
+      'INSERT INTO user_activity_log (user_id, action, details) VALUES ($1, $2, $3)',
+      [buttonInfo.rows[0].created_by, 'button_deleted', JSON.stringify({ 
+        button_id: buttonId,
+        button_name: buttonInfo.rows[0].name,
+        location_id: buttonInfo.rows[0].location_id
+      })]
+    );
+    
     await client.query('COMMIT');
+    logger.info(`Button ${buttonId} (${buttonInfo.rows[0].name}) erfolgreich gelöscht`);
   } catch (error) {
     await client.query('ROLLBACK');
     logger.error(`Fehler beim Löschen des Buttons: ${error}`);
@@ -413,6 +496,13 @@ export const sendBulkEmails = async (
     await client.query('BEGIN');
     
     for (const recipient of recipients) {
+      // Personalisierte E-Mail erstellen
+      const personalizedSubject = template.subject;
+      let personalizedBody = template.body;
+      
+      // Einfache Personalisierung: Name ersetzen
+      personalizedBody = personalizedBody.replace(/\{\{name\}\}/g, recipient.name);
+      
       // Record the email in the database
       const recordQuery = `
         INSERT INTO sent_emails (recipient_email, recipient_name, template_id, sender, subject, body, status, location_id)
@@ -421,7 +511,7 @@ export const sendBulkEmails = async (
       
       const recordResult = await client.query(
         recordQuery,
-        [recipient.email, recipient.name, templateId, senderEmail, template.subject, template.body, 'sent', template.location_id]
+        [recipient.email, recipient.name, templateId, senderEmail, personalizedSubject, personalizedBody, 'sent', template.location_id]
       );
       
       // Send the email
@@ -429,10 +519,12 @@ export const sendBulkEmails = async (
         await sendEmail({
           to: recipient.email,
           from: process.env.EMAIL_FROM || senderEmail,
-          subject: template.subject,
-          text: template.body,  // Add personalization logic here if needed
-          html: template.body   // Add HTML formatting and personalization logic here
+          subject: personalizedSubject,
+          text: personalizedBody,
+          html: personalizedBody // HTML-Formatierung könnte hier hinzugefügt werden
         });
+        
+        logger.info(`E-Mail erfolgreich gesendet an ${recipient.email}`);
       } catch (emailError) {
         logger.error(`Fehler beim Senden der E-Mail an ${recipient.email}: ${emailError}`);
         
@@ -445,6 +537,7 @@ export const sendBulkEmails = async (
     }
     
     await client.query('COMMIT');
+    logger.info(`Bulk-E-Mail-Versand abgeschlossen: ${recipients.length} E-Mails verarbeitet`);
   } catch (error) {
     await client.query('ROLLBACK');
     logger.error(`Fehler beim Bulk-Versand von E-Mails: ${error}`);
@@ -454,7 +547,7 @@ export const sendBulkEmails = async (
   }
 };
 
-// Get location by ID
+// Standort abrufen
 export const getLocationById = async (locationId: string): Promise<Location | null> => {
   try {
     const result = await pool.query('SELECT * FROM locations WHERE id = $1', [locationId]);
@@ -465,12 +558,19 @@ export const getLocationById = async (locationId: string): Promise<Location | nu
   }
 };
 
-// Delete location
+// Standort löschen
 export const deleteLocation = async (locationId: string): Promise<boolean> => {
   const client = await pool.connect();
   
   try {
     await client.query('BEGIN');
+    
+    // Standort-Informationen vor dem Löschen abrufen (für Logging)
+    const locationInfo = await client.query('SELECT * FROM locations WHERE id = $1', [locationId]);
+    
+    if (locationInfo.rows.length === 0) {
+      throw new Error('Standort nicht gefunden');
+    }
     
     // First check if the location is used by any users
     const userCheck = await client.query(
@@ -479,7 +579,7 @@ export const deleteLocation = async (locationId: string): Promise<boolean> => {
     );
     
     if (parseInt(userCheck.rows[0].count) > 0) {
-      throw new Error('Location is still associated with users');
+      throw new Error('Der Standort ist noch mit Benutzern verknüpft');
     }
     
     // Check if the location has buttons
@@ -489,7 +589,7 @@ export const deleteLocation = async (locationId: string): Promise<boolean> => {
     );
     
     if (parseInt(buttonCheck.rows[0].count) > 0) {
-      throw new Error('Location is still associated with buttons');
+      throw new Error('Der Standort ist noch mit Buttons verknüpft');
     }
     
     // Check if the location has email templates
@@ -499,7 +599,7 @@ export const deleteLocation = async (locationId: string): Promise<boolean> => {
     );
     
     if (parseInt(emailCheck.rows[0].count) > 0) {
-      throw new Error('Location is still associated with email templates');
+      throw new Error('Der Standort ist noch mit E-Mail-Vorlagen verknüpft');
     }
     
     // If we get here, we can safely delete the location
@@ -508,8 +608,17 @@ export const deleteLocation = async (locationId: string): Promise<boolean> => {
       [locationId]
     );
     
-    await client.query('COMMIT');
+    // Aktivität protokollieren
+    await client.query(
+      'INSERT INTO user_activity_log (action, details) VALUES ($1, $2)',
+      ['location_deleted', JSON.stringify({ 
+        location_id: locationId,
+        location_name: locationInfo.rows[0].name
+      })]
+    );
     
+    await client.query('COMMIT');
+    logger.info(`Standort ${locationId} (${locationInfo.rows[0].name}) erfolgreich gelöscht`);
     return result.rows.length > 0;
   } catch (error) {
     await client.query('ROLLBACK');
@@ -522,143 +631,163 @@ export const deleteLocation = async (locationId: string): Promise<boolean> => {
 
 // Benutzer deaktivieren
 export const deactivateUser = async (userId: string, deactivatedBy: string): Promise<boolean> => {
+  const client = await pool.connect();
+  
   try {
-    const client = await pool.connect();
+    await client.query('BEGIN');
     
-    try {
-      await client.query('BEGIN');
-      
-      // Update the user's is_active status
-      const updateResult = await client.query(
-        'UPDATE users SET is_active = false, deactivated_by = $1, deactivated_at = NOW() WHERE id = $2 RETURNING id',
-        [deactivatedBy, userId]
-      );
-      
-      if (updateResult.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return false;
-      }
-      
-      await client.query('COMMIT');
-      return true;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      logger.error(`Fehler beim Deaktivieren des Benutzers: ${error}`);
-      throw error;
-    } finally {
-      client.release();
+    // Benutzerinformationen abrufen
+    const userInfo = await client.query('SELECT * FROM users WHERE id = $1', [userId]);
+    
+    if (userInfo.rows.length === 0) {
+      throw new Error('Benutzer nicht gefunden');
     }
+    
+    // Update the user's is_active status
+    const updateResult = await client.query(
+      'UPDATE users SET is_active = false, deactivated_by = $1, deactivated_at = NOW(), updated_at = NOW() WHERE id = $2 RETURNING id',
+      [deactivatedBy, userId]
+    );
+    
+    if (updateResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    
+    // Aktivität protokollieren
+    await client.query(
+      'INSERT INTO user_activity_log (user_id, action, performed_by, details) VALUES ($1, $2, $3, $4)',
+      [userId, 'deactivated', deactivatedBy, JSON.stringify({ 
+        deactivated_by: deactivatedBy,
+        deactivated_at: new Date().toISOString()
+      })]
+    );
+    
+    await client.query('COMMIT');
+    logger.info(`Benutzer ${userId} (${userInfo.rows[0].email}) deaktiviert durch ${deactivatedBy}`);
+    return true;
   } catch (error) {
+    await client.query('ROLLBACK');
     logger.error(`Fehler beim Deaktivieren des Benutzers: ${error}`);
     throw error;
+  } finally {
+    client.release();
   }
 };
 
 // Benutzer reaktivieren
 export const reactivateUser = async (userId: string, reactivatedBy: string): Promise<boolean> => {
+  const client = await pool.connect();
+  
   try {
-    const client = await pool.connect();
+    await client.query('BEGIN');
     
-    try {
-      await client.query('BEGIN');
-      
-      // Überprüfen, ob der Benutzer deaktiviert ist
-      const checkResult = await client.query(
-        'SELECT * FROM users WHERE id = $1 AND is_active = false',
-        [userId]
-      );
-      
-      if (checkResult.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return false; // Benutzer existiert nicht oder ist bereits aktiv
-      }
-      
-      // Update the user's is_active status
-      const updateResult = await client.query(
-        'UPDATE users SET is_active = true, deactivated_by = NULL, deactivated_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING id',
-        [userId]
-      );
-      
-      if (updateResult.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return false;
-      }
-      
-      // Log reactivation event
-      await client.query(
-        'INSERT INTO user_activity_log (user_id, action, performed_by, performed_at) VALUES ($1, $2, $3, NOW())',
-        [userId, 'reactivated', reactivatedBy]
-      );
-      
-      await client.query('COMMIT');
-      return true;
-    } catch (error) {
+    // Überprüfen, ob der Benutzer existiert und deaktiviert ist
+    const checkResult = await client.query(
+      'SELECT * FROM users WHERE id = $1 AND is_active = false',
+      [userId]
+    );
+    
+    if (checkResult.rows.length === 0) {
       await client.query('ROLLBACK');
-      logger.error(`Fehler beim Reaktivieren des Benutzers: ${error}`);
-      throw error;
-    } finally {
-      client.release();
+      return false; // Benutzer existiert nicht oder ist bereits aktiv
     }
+    
+    // Update the user's is_active status
+    const updateResult = await client.query(
+      'UPDATE users SET is_active = true, deactivated_by = NULL, deactivated_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING id',
+      [userId]
+    );
+    
+    if (updateResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    
+    // Log reactivation event
+    await client.query(
+      'INSERT INTO user_activity_log (user_id, action, performed_by, details) VALUES ($1, $2, $3, $4)',
+      [userId, 'reactivated', reactivatedBy, JSON.stringify({ 
+        reactivated_by: reactivatedBy,
+        reactivated_at: new Date().toISOString()
+      })]
+    );
+    
+    await client.query('COMMIT');
+    logger.info(`Benutzer ${userId} (${checkResult.rows[0].email}) reaktiviert durch ${reactivatedBy}`);
+    return true;
   } catch (error) {
+    await client.query('ROLLBACK');
     logger.error(`Fehler beim Reaktivieren des Benutzers: ${error}`);
     throw error;
+  } finally {
+    client.release();
   }
 };
 
 // Benutzer permanent löschen
 export const deleteUser = async (userId: string): Promise<boolean> => {
+  const client = await pool.connect();
+  
   try {
-    const client = await pool.connect();
+    await client.query('BEGIN');
     
-    try {
-      await client.query('BEGIN');
-      
-      // Überprüfen, ob Benutzer existiert
-      const userCheck = await client.query(
-        'SELECT * FROM users WHERE id = $1',
-        [userId]
-      );
-      
-      if (userCheck.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return false;
-      }
-      
-      // Entferne Benutzer aus allen Standorten
-      await client.query(
-        'DELETE FROM user_locations WHERE user_id = $1',
-        [userId]
-      );
-      
-      // Entferne Button-Berechtigungen für den Benutzer
-      await client.query(
-        'DELETE FROM button_permissions WHERE user_id = $1',
-        [userId]
-      );
-      
-      // Lösche den Benutzer
-      const deleteResult = await client.query(
-        'DELETE FROM users WHERE id = $1 RETURNING id',
-        [userId]
-      );
-      
-      if (deleteResult.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return false;
-      }
-      
-      await client.query('COMMIT');
-      return true;
-    } catch (error) {
+    // Benutzerinformationen abrufen
+    const userInfo = await client.query('SELECT * FROM users WHERE id = $1', [userId]);
+    
+    if (userInfo.rows.length === 0) {
       await client.query('ROLLBACK');
-      logger.error(`Fehler beim permanenten Löschen des Benutzers: ${error}`);
-      throw error;
-    } finally {
-      client.release();
+      return false;
     }
+    
+    // Entferne Benutzer aus allen Standorten
+    await client.query(
+      'DELETE FROM user_locations WHERE user_id = $1',
+      [userId]
+    );
+    
+    // Entferne Button-Berechtigungen für den Benutzer
+    await client.query(
+      'DELETE FROM button_permissions WHERE user_id = $1',
+      [userId]
+    );
+    
+    // Lösche Aktivitätslogs des Benutzers
+    await client.query(
+      'DELETE FROM user_activity_log WHERE user_id = $1',
+      [userId]
+    );
+    
+    // Aktivität protokollieren (global)
+    await client.query(
+      'INSERT INTO user_activity_log (action, details) VALUES ($1, $2)',
+      ['user_deleted', JSON.stringify({ 
+        user_id: userId,
+        user_email: userInfo.rows[0].email,
+        deleted_at: new Date().toISOString()
+      })]
+    );
+    
+    // Lösche den Benutzer
+    const deleteResult = await client.query(
+      'DELETE FROM users WHERE id = $1 RETURNING id',
+      [userId]
+    );
+    
+    if (deleteResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    
+    await client.query('COMMIT');
+    logger.info(`Benutzer ${userId} (${userInfo.rows[0].email}) permanent gelöscht`);
+    return true;
   } catch (error) {
+    await client.query('ROLLBACK');
     logger.error(`Fehler beim permanenten Löschen des Benutzers: ${error}`);
     throw error;
+  } finally {
+    client.release();
   }
 };
 
@@ -679,8 +808,8 @@ export const getDeactivatedUsers = async (): Promise<User[]> => {
 export const getUserActivityLog = async (userId: string): Promise<any[]> => {
   try {
     const result = await pool.query(
-      `SELECT ual.*, 
-              u.email as performed_by_email 
+      `SELECT ual.*,
+       u.email as performed_by_email
        FROM user_activity_log ual
        LEFT JOIN users u ON ual.performed_by = u.id
        WHERE ual.user_id = $1
@@ -693,8 +822,6 @@ export const getUserActivityLog = async (userId: string): Promise<any[]> => {
     throw error;
   }
 };
-
-// Ergänzungen für /backend/src/models/User.ts - Fügen Sie diese neue Funktion hinzu
 
 // Benutzer zu einem Standort einladen
 export const inviteUserToLocation = async (userId: string, locationId: string): Promise<boolean> => {
@@ -719,24 +846,40 @@ export const inviteUserToLocation = async (userId: string, locationId: string): 
       'SELECT * FROM user_locations WHERE user_id = $1 AND location_id = $2',
       [userId, locationId]
     );
+    
     if (existingCheck.rows.length > 0) {
-      throw new Error('Der Benutzer ist bereits diesem Standort zugeordnet');
+      // Prüfen, ob die Zuordnung aktiv ist
+      if (existingCheck.rows[0].is_active) {
+        throw new Error('Der Benutzer ist bereits diesem Standort zugeordnet');
+      } else {
+        // Wenn die Zuordnung existiert, aber deaktiviert ist, reaktivieren wir sie
+        await client.query(
+          'UPDATE user_locations SET is_active = true, invited_at = NOW() WHERE user_id = $1 AND location_id = $2',
+          [userId, locationId]
+        );
+        
+        logger.info(`Standortzuordnung reaktiviert für Benutzer ${userId} am Standort ${locationId}`);
+      }
+    } else {
+      // Neue Zuordnung erstellen
+      await client.query(
+        'INSERT INTO user_locations (user_id, location_id, is_active, invited_at) VALUES ($1, $2, true, NOW())',
+        [userId, locationId]
+      );
+      
+      logger.info(`Neue Standortzuordnung erstellt für Benutzer ${userId} am Standort ${locationId}`);
     }
     
     // Reaktiviere den Benutzer, falls er deaktiviert ist
     const user = userCheck.rows[0];
     if (!user.is_active) {
       await client.query(
-        'UPDATE users SET is_active = true, deactivated_by = NULL, deactivated_at = NULL WHERE id = $1',
+        'UPDATE users SET is_active = true, deactivated_by = NULL, deactivated_at = NULL, updated_at = NOW() WHERE id = $1',
         [userId]
       );
+      
+      logger.info(`Benutzer ${userId} wurde reaktiviert`);
     }
-    
-    // Standort für Benutzer hinzufügen
-    await client.query(
-      'INSERT INTO user_locations (user_id, location_id) VALUES ($1, $2)',
-      [userId, locationId]
-    );
     
     // Aktivität protokollieren
     await client.query(
@@ -749,6 +892,7 @@ export const inviteUserToLocation = async (userId: string, locationId: string): 
     // E-Mail-Benachrichtigung senden
     try {
       await sendInvitationEmail(user.email, locationCheck.rows[0].name);
+      logger.info(`Einladungs-E-Mail gesendet an ${user.email} für Standort ${locationCheck.rows[0].name}`);
     } catch (emailError) {
       logger.error(`Failed to send invitation email: ${emailError}`);
       // Wir setzen den Erfolg trotzdem fort, auch wenn die E-Mail fehlschlägt
@@ -756,7 +900,6 @@ export const inviteUserToLocation = async (userId: string, locationId: string): 
     
     return true;
   } catch (error) {
-    // Fortsetzung der inviteUserToLocation-Funktion
     await client.query('ROLLBACK');
     logger.error(`Fehler beim Einladen des Benutzers: ${error}`);
     throw error;
@@ -767,7 +910,7 @@ export const inviteUserToLocation = async (userId: string, locationId: string): 
 
 // Funktion für die Einladungs-E-Mail
 export const sendInvitationEmail = async (email: string, locationName: string): Promise<void> => {
-  const invitationLink = `${process.env.FRONTEND_URL}/login`;
+  const invitationLink = `${process.env.FRONTEND_URL || 'https://dashboard-frontend-p693.onrender.com'}/login`;
   
   await sendEmail({
     to: email,
@@ -775,12 +918,14 @@ export const sendInvitationEmail = async (email: string, locationName: string): 
     subject: `Einladung zum Standort ${locationName}`,
     text: `Sie wurden zum Standort "${locationName}" eingeladen. Bitte melden Sie sich an unter: ${invitationLink}`,
     html: `
-      <p>Hallo,</p>
-      <p>Sie wurden zum Standort <strong>"${locationName}"</strong> eingeladen.</p>
-      <p>Bitte melden Sie sich an unter: <a href="${invitationLink}">${invitationLink}</a></p>
-      <p>Mit freundlichen Grüßen,<br>Ihr Dashboard-Team</p>
+    <p>Hallo,</p>
+    <p>Sie wurden zum Standort <strong>"${locationName}"</strong> eingeladen.</p>
+    <p>Bitte melden Sie sich an unter: <a href="${invitationLink}">${invitationLink}</a></p>
+    <p>Mit freundlichen Grüßen,<br>Ihr Dashboard-Team</p>
     `
   });
+  
+  logger.info(`Einladungs-E-Mail an ${email} für Standort ${locationName} gesendet`);
 };
 
 // Alle Benutzer abrufen (für Einladungen)
@@ -797,10 +942,13 @@ export const getAllUsers = async (): Promise<User[]> => {
     
     // Format the results to include locations as objects
     return result.rows.map(user => {
-      const locations = user.location_ids.map((id, index) => ({
-        id: id,
-        name: user.location_names[index]
-      })).filter(loc => loc.id !== null);
+      // Filter out null values that might occur if user has no locations
+      const locations = user.location_ids
+        .map((id, index) => ({
+          id: id,
+          name: user.location_names[index]
+        }))
+        .filter(loc => loc.id !== null && loc.name !== null);
       
       return {
         ...user,
@@ -814,8 +962,60 @@ export const getAllUsers = async (): Promise<User[]> => {
     throw error;
   }
 };
-  
 
+// Fehlgeschlagene E-Mails erneut senden
+export const resendFailedEmails = async (emailIds: string[]): Promise<boolean> => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    for (const emailId of emailIds) {
+      // Hole E-Mail-Informationen
+      const emailQuery = 'SELECT * FROM sent_emails WHERE id = $1 AND status = $2';
+      const emailResult = await client.query(emailQuery, [emailId, 'failed']);
+      
+      if (emailResult.rows.length === 0) {
+        logger.warn(`E-Mail ${emailId} nicht gefunden oder nicht fehlgeschlagen`);
+        continue;
+      }
+      
+      const email = emailResult.rows[0];
+      
+      // Versuche, die E-Mail erneut zu senden
+      try {
+        await sendEmail({
+          to: email.recipient_email,
+          from: process.env.EMAIL_FROM || email.sender,
+          subject: email.subject,
+          text: email.body,
+          html: email.body
+        });
+        
+        // Aktualisiere den Status
+        await client.query(
+          'UPDATE sent_emails SET status = $1 WHERE id = $2',
+          ['resent', emailId]
+        );
+        
+        logger.info(`E-Mail ${emailId} erfolgreich erneut gesendet an ${email.recipient_email}`);
+      } catch (sendError) {
+        logger.error(`Fehler beim erneuten Senden der E-Mail ${emailId}: ${sendError}`);
+      }
+    }
+    
+    await client.query('COMMIT');
+    return true;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    logger.error(`Fehler beim erneuten Senden der E-Mails: ${error}`);
+    return false;
+  } finally {
+    client.release();
+  }
+};
+
+// Ein Export-Objekt für einfachere Verwendung
 export const UserModel = {
   createUser,
   getUserByEmail,
