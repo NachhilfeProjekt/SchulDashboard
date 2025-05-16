@@ -166,4 +166,10 @@ export const getCurrentUser = async () => {
   return response.data.user;
 };
 
+// Standorte des aktuellen Benutzers abrufen
+export const getUserLocations = async () => {
+  const response = await api.get('/locations/my-locations');
+  return response.data;
+};
+
 export default api;
