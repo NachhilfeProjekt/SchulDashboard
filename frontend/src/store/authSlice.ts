@@ -6,13 +6,15 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   currentLocation: Location | null;
+  locations: Location[];
 }
 
 const initialState: AuthState = {
   user: null,
-  token: localStorage.getItem('schul_dashboard_token'),  // Korrekter Schlüssel gemäß LoginPage
+  token: localStorage.getItem('schul_dashboard_token'),
   isAuthenticated: !!localStorage.getItem('schul_dashboard_token'),
-  currentLocation: null,
+  currentLocation: JSON.parse(localStorage.getItem('schul_dashboard_current_location') || 'null'),
+  locations: JSON.parse(localStorage.getItem('schul_dashboard_locations') || '[]') // Diese Zeile hinzufügen
 };
 
 const authSlice = createSlice({
@@ -29,19 +31,25 @@ const authSlice = createSlice({
       }
       localStorage.setItem('schul_dashboard_token', action.payload.token);
     },
-    loginSuccess: (state, action: PayloadAction<{ user: User; token: string }>) => {
-      state.user = action.payload.user;
-      state.token = action.payload.token;
-      state.isAuthenticated = true;
+   loginSuccess: (state, action: PayloadAction<{ user: User; token: string; locations: Location[] }>) => {
+  state.user = action.payload.user;
+  state.token = action.payload.token;
+  state.isAuthenticated = true;
+  state.locations = action.payload.locations;
       
       // Setze den Standard-Standort auf den ersten Standort des Benutzers, wenn verfügbar
-      if (action.payload.user.locations && action.payload.user.locations.length > 0) {
-        state.currentLocation = action.payload.user.locations[0];
-      }
+      if (action.payload.locations && action.payload.locations.length > 0) {
+    state.currentLocation = action.payload.locations[0];
+  }
       
       // Speichere Daten im localStorage wie in LoginPage erwartet
       localStorage.setItem('schul_dashboard_token', action.payload.token);
-    },
+  localStorage.setItem('schul_dashboard_user', JSON.stringify(action.payload.user));
+  localStorage.setItem('schul_dashboard_locations', JSON.stringify(action.payload.locations || []));
+  if (action.payload.locations && action.payload.locations.length > 0) {
+    localStorage.setItem('schul_dashboard_current_location', JSON.stringify(action.payload.locations[0]));
+  }
+},
     updateUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
     },
