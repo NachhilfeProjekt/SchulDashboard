@@ -8,10 +8,11 @@ import {
   reactivateUser,
   deleteUser,
   getDeactivatedUsers,
-  getUserActivityLog
+  getUserActivityLog,
+  inviteUserToLocation,
+  getAllUsers
 } from '../models/User';
 import pool from '../config/database';
-import { sendEmail } from '../services/emailService';
 
 const router = express.Router();
 
@@ -58,6 +59,22 @@ router.get('/deactivated', authorize(['developer']), async (req, res) => {
 // Get user activity log (only for developers)
 router.get('/:userId/activity-log', authorize(['developer']), async (req, res) => {
   try {
+    // Prüfen, ob die Tabelle existiert
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS user_activity_log (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id),
+          action VARCHAR(50) NOT NULL,
+          performed_by UUID REFERENCES users(id),
+          performed_at TIMESTAMP DEFAULT NOW(),
+          details JSONB
+        )
+      `);
+    } catch (tableError) {
+      console.error('Error checking/creating activity log table:', tableError);
+    }
+    
     const activityLog = await getUserActivityLog(req.params.userId);
     res.json(activityLog);
   } catch (error) {
@@ -73,14 +90,17 @@ router.post('/:userId/deactivate', authorize(['developer', 'lead']), async (req,
     if (req.params.userId === req.user.userId) {
       return res.status(400).json({ message: 'Sie können Ihren eigenen Account nicht deaktivieren.' });
     }
+
     // Ensure developers can only be deactivated by other developers
     const targetUser = await getUserById(req.params.userId);
     if (!targetUser) {
       return res.status(404).json({ message: 'Benutzer nicht gefunden.' });
     }
+
     if (targetUser.role === 'developer' && req.user.role !== 'developer') {
       return res.status(403).json({ message: 'Nur Entwickler können andere Entwickler deaktivieren.' });
     }
+
     // Call deactivateUser function
     await deactivateUser(req.params.userId, req.user.userId);
     res.json({ message: 'Benutzer erfolgreich deaktiviert.' });
@@ -100,6 +120,7 @@ router.post('/:userId/reactivate', authorize(['developer']), async (req, res) =>
     if (targetUser.is_active) {
       return res.status(400).json({ message: 'Benutzer ist bereits aktiv.' });
     }
+
     // Call reactivateUser function
     await reactivateUser(req.params.userId, req.user.userId);
     res.json({ message: 'Benutzer erfolgreich reaktiviert.' });
@@ -116,10 +137,12 @@ router.delete('/:userId', authorize(['developer']), async (req, res) => {
     if (req.params.userId === req.user.userId) {
       return res.status(400).json({ message: 'Sie können Ihren eigenen Account nicht löschen.' });
     }
+
     const targetUser = await getUserById(req.params.userId);
     if (!targetUser) {
       return res.status(404).json({ message: 'Benutzer nicht gefunden.' });
     }
+
     // Call deleteUser function
     const success = await deleteUser(req.params.userId);
     if (success) {
@@ -132,8 +155,6 @@ router.delete('/:userId', authorize(['developer']), async (req, res) => {
     res.status(500).json({ message: 'Fehler beim Löschen des Benutzers.' });
   }
 });
-
-// Ergänzungen für /backend/src/routes/userRoutes.ts - Fügen Sie diese neuen Routen hinzu
 
 // Benutzer zu einem Standort einladen
 router.post('/invite', authorize(['developer', 'lead']), async (req, res) => {
