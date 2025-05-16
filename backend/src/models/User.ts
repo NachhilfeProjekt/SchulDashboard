@@ -693,6 +693,72 @@ export const getUserActivityLog = async (userId: string): Promise<any[]> => {
     throw error;
   }
 };
+
+// Ergänzungen für /backend/src/models/User.ts - Fügen Sie diese neue Funktion hinzu
+
+// Benutzer zu einem Standort einladen
+export const inviteUserToLocation = async (userId: string, locationId: string): Promise<boolean> => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // Prüfen, ob Benutzer existiert
+    const userCheck = await client.query('SELECT * FROM users WHERE id = $1', [userId]);
+    if (userCheck.rows.length === 0) {
+      throw new Error('Benutzer nicht gefunden');
+    }
+    
+    // Prüfen, ob Standort existiert
+    const locationCheck = await client.query('SELECT * FROM locations WHERE id = $1', [locationId]);
+    if (locationCheck.rows.length === 0) {
+      throw new Error('Standort nicht gefunden');
+    }
+    
+    // Prüfen, ob der Benutzer bereits diesem Standort zugeordnet ist
+    const existingCheck = await client.query(
+      'SELECT * FROM user_locations WHERE user_id = $1 AND location_id = $2',
+      [userId, locationId]
+    );
+    if (existingCheck.rows.length > 0) {
+      throw new Error('Der Benutzer ist bereits diesem Standort zugeordnet');
+    }
+    
+    // Reaktiviere den Benutzer, falls er deaktiviert ist
+    const user = userCheck.rows[0];
+    if (!user.is_active) {
+      await client.query(
+        'UPDATE users SET is_active = true, deactivated_by = NULL, deactivated_at = NULL WHERE id = $1',
+        [userId]
+      );
+    }
+    
+    // Standort für Benutzer hinzufügen
+    await client.query(
+      'INSERT INTO user_locations (user_id, location_id) VALUES ($1, $2)',
+      [userId, locationId]
+    );
+    
+    // Aktivität protokollieren
+    await client.query(
+      'INSERT INTO user_activity_log (user_id, action, details) VALUES ($1, $2, $3)',
+      [userId, 'invited_to_location', JSON.stringify({ locationId, locationName: locationCheck.rows[0].name })]
+    );
+    
+    await client.query('COMMIT');
+    
+    // E-Mail-Benachrichtigung senden
+    try {
+      await sendInvitationEmail(user.email, locationCheck.rows[0].name);
+    } catch (emailError) {
+      logger.error(`Failed to send invitation email: ${emailError}`);
+      // Wir setzen den Erfolg trotzdem fort, auch wenn die E-Mail fehlschlägt
+    }
+    
+    return true;
+  } catch (error) {
+    await
+  };
+
 export const UserModel = {
   createUser,
   getUserByEmail,
