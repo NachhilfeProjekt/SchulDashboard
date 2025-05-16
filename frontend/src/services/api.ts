@@ -161,4 +161,9 @@ export const getButtonsForUser = async (locationId: string) => {
   }
 };
 
+export const getCurrentUser = async () => {
+  const response = await api.get('/auth/current-user');
+  return response.data.user;
+};
+
 export default api;
