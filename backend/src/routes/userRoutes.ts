@@ -133,4 +133,46 @@ router.delete('/:userId', authorize(['developer']), async (req, res) => {
   }
 });
 
+// Ergänzungen für /backend/src/routes/userRoutes.ts - Fügen Sie diese neuen Routen hinzu
+
+// Benutzer zu einem Standort einladen
+router.post('/invite', authorize(['developer', 'lead']), async (req, res) => {
+  try {
+    const { userId, locationId } = req.body;
+    
+    // Validate input
+    if (!userId || !locationId) {
+      return res.status(400).json({ message: 'Benutzer-ID und Standort-ID sind erforderlich' });
+    }
+    
+    // Check if user has access to location
+    if (req.user.role !== 'developer' && !req.user.locations.includes(locationId)) {
+      return res.status(403).json({ message: 'Sie haben keinen Zugriff auf diesen Standort' });
+    }
+    
+    // Invite user
+    await inviteUserToLocation(userId, locationId);
+    
+    res.json({ message: 'Benutzer wurde erfolgreich zum Standort eingeladen' });
+  } catch (error) {
+    console.error('Invite user error:', error);
+    if (error.message) {
+      res.status(400).json({ message: error.message });
+    } else {
+      res.status(500).json({ message: 'Fehler beim Einladen des Benutzers' });
+    }
+  }
+});
+
+// Alle Benutzer abrufen (nur für Entwickler und Leitung)
+router.get('/all', authorize(['developer', 'lead']), async (req, res) => {
+  try {
+    const users = await getAllUsers();
+    res.json(users);
+  } catch (error) {
+    console.error('Get all users error:', error);
+    res.status(500).json({ message: 'Fehler beim Abrufen aller Benutzer' });
+  }
+});
+
 export default router;
