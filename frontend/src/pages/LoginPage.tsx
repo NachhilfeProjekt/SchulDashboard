@@ -79,56 +79,57 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
+  try {
+    console.log('Login-Versuch mit:', { email, password: '***' });
     
-    try {
-      console.log('Login-Versuch mit:', { email, password: '***' });
-      
-      // Direkter Login-Versuch
-      const response = await axios.post('https://dashboard-backend-uweg.onrender.com/api/auth/login', {
-        email,
-        password
-      });
-      
-      console.log('Login erfolgreich:', response.data);
-      
-      // Token und Benutzerdaten im localStorage speichern
-      localStorage.setItem('schul_dashboard_token', response.data.token);
-      localStorage.setItem('schul_dashboard_user', JSON.stringify(response.data.user));
-      localStorage.setItem('schul_dashboard_locations', JSON.stringify(response.data.locations || []));
-      
-      if (response.data.locations && response.data.locations.length > 0) {
-        localStorage.setItem('schul_dashboard_current_location', JSON.stringify(response.data.locations[0]));
-      }
-      
-      // Redux-Store aktualisieren
-      dispatch(loginSuccess({
-        token: response.data.token,
-        user: response.data.user,
-        locations: response.data.locations || []
-      }));
-      
-      // Weiterleitung zum Dashboard
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Login-Fehler:', error);
-      
-      if (axios.isAxiosError(error) && error.response) {
-        setError(error.response.data.message || 'Anmeldung fehlgeschlagen.');
-      } else if (axios.isAxiosError(error) && error.request) {
-        setError('Keine Antwort vom Server. Überprüfen Sie Ihre Internetverbindung.');
-        setOfflineMode(true);
-      } else {
-        setError('Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.');
-      }
-    } finally {
-      setLoading(false);
+    // Direkter Login-Versuch mit voller URL
+    const apiUrl = import.meta.env.VITE_API_URL || 'https://dashboard-backend-uweg.onrender.com/api';
+    console.log('Verwende API-URL:', apiUrl);
+    
+    const response = await axios.post(`${apiUrl}/auth/login`, {
+      email,
+      password
+    });
+    
+    console.log('Login erfolgreich:', response.data);
+    
+    // Token und Benutzerdaten im localStorage speichern
+    localStorage.setItem('schul_dashboard_token', response.data.token);
+    localStorage.setItem('schul_dashboard_user', JSON.stringify(response.data.user));
+    localStorage.setItem('schul_dashboard_locations', JSON.stringify(response.data.locations || []));
+    
+    if (response.data.locations && response.data.locations.length > 0) {
+      localStorage.setItem('schul_dashboard_current_location', JSON.stringify(response.data.locations[0]));
     }
-  };
-
+    
+    // Redux-Store aktualisieren
+    dispatch(loginSuccess({
+      token: response.data.token,
+      user: response.data.user,
+      locations: response.data.locations || []
+    }));
+    
+    // Weiterleitung zum Dashboard
+    navigate('/dashboard');
+  } catch (error) {
+    console.error('Login-Fehler:', error);
+    
+    if (axios.isAxiosError(error) && error.response) {
+      setError(error.response.data.message || 'Anmeldung fehlgeschlagen.');
+    } else if (axios.isAxiosError(error) && error.request) {
+      setError('Keine Antwort vom Server. Überprüfen Sie Ihre Internetverbindung.');
+      setOfflineMode(true);
+    } else {
+      setError('Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.');
+    }
+  } finally {
+    setLoading(false);
+  }
+};
   const handleOfflineMode = () => {
     setLoading(true);
     setError('');
