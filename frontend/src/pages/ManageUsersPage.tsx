@@ -2,28 +2,33 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
-import { 
-  getUsersByLocation, 
-  createUser, 
-  deactivateUser, 
-  deleteUser, 
-  getDeactivatedUsers, 
-  reactivateUser 
+import {
+  getUsersByLocation,
+  createUser,
+  deactivateUser,
+  deleteUser,
+  getDeactivatedUsers,
+  reactivateUser,
+  inviteUserToLocation,
+  getAllUsers
 } from '../services/api';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Box, Button, Typography, Paper, Table, TableBody, TableCell, 
-  TableContainer, TableHead, TableRow, Dialog, DialogTitle, 
-  DialogContent, DialogActions, TextField, FormControl, 
+import {
+  Box, Button, Typography, Paper, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, Dialog, DialogTitle,
+  DialogContent, DialogActions, TextField, FormControl,
   InputLabel, Select, MenuItem, Chip, IconButton, Alert, CircularProgress,
-  Tabs, Tab, Divider
+  Tabs, Tab, Divider, OutlinedInput, InputAdornment, Tooltip, List, ListItem, ListItemText, Checkbox
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import BlockIcon from '@mui/icons-material/Block';
 import RestoreIcon from '@mui/icons-material/Restore';
-import { User } from '../types';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import { User, Location } from '../types';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -33,7 +38,6 @@ interface TabPanelProps {
 
 const TabPanel = (props: TabPanelProps) => {
   const { children, value, index, ...other } = props;
-
   return (
     <div
       role="tabpanel"
@@ -48,11 +52,14 @@ const TabPanel = (props: TabPanelProps) => {
 };
 
 const ManageUsersPage: React.FC = () => {
-  const { user: currentUser, currentLocation } = useSelector((state: RootState) => state.auth);
+  const { user: currentUser, currentLocation, locations } = useSelector((state: RootState) => state.auth);
   const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [deactivatedUsers, setDeactivatedUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [tabValue, setTabValue] = useState(0);
   const [openDialog, setOpenDialog] = useState(false);
+  const [openInviteDialog, setOpenInviteDialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -61,10 +68,13 @@ const ManageUsersPage: React.FC = () => {
     role: 'teacher',
     locations: currentLocation ? [currentLocation.id] : []
   });
+  const [searchQuery, setSearchQuery] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [userToManage, setUserToManage] = useState<any | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<'deactivate' | 'delete' | 'reactivate' | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   
   const navigate = useNavigate();
 
@@ -72,19 +82,25 @@ const ManageUsersPage: React.FC = () => {
     if (currentLocation) {
       fetchUsers();
     }
-    
     if (currentUser?.role === 'developer') {
       fetchDeactivatedUsers();
+      fetchAllUsers();
     }
   }, [currentLocation, currentUser]);
 
+  useEffect(() => {
+    if (users.length > 0) {
+      filterUsers();
+    }
+  }, [searchQuery, users]);
+
   const fetchUsers = async () => {
     if (!currentLocation) return;
-    
     setLoading(true);
     try {
       const data = await getUsersByLocation(currentLocation.id);
       setUsers(data);
+      setFilteredUsers(data);
     } catch (error) {
       console.error('Error fetching users:', error);
       setError('Fehler beim Laden der Benutzer. Bitte versuchen Sie es später erneut.');
@@ -95,7 +111,6 @@ const ManageUsersPage: React.FC = () => {
 
   const fetchDeactivatedUsers = async () => {
     if (currentUser?.role !== 'developer') return;
-    
     setLoading(true);
     try {
       const data = await getDeactivatedUsers();
@@ -108,6 +123,33 @@ const ManageUsersPage: React.FC = () => {
     }
   };
 
+  const fetchAllUsers = async () => {
+    if (currentUser?.role !== 'developer' && currentUser?.role !== 'lead') return;
+    setLoading(true);
+    try {
+      const data = await getAllUsers();
+      setAllUsers(data);
+    } catch (error) {
+      console.error('Error fetching all users:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterUsers = () => {
+    if (!searchQuery.trim()) {
+      setFilteredUsers(users);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = users.filter(user => 
+      user.email.toLowerCase().includes(query) || 
+      user.role.toLowerCase().includes(query)
+    );
+    setFilteredUsers(filtered);
+  };
+
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
@@ -116,7 +158,6 @@ const ManageUsersPage: React.FC = () => {
     setLoading(true);
     setError('');
     setSuccess('');
-    
     try {
       await createUser(newUser.email, newUser.role, newUser.locations);
       setOpenDialog(false);
@@ -125,7 +166,6 @@ const ManageUsersPage: React.FC = () => {
         role: 'teacher',
         locations: currentLocation ? [currentLocation.id] : []
       });
-      
       setSuccess('Benutzer wurde erfolgreich erstellt. Eine E-Mail mit temporärem Passwort wurde versendet.');
       await fetchUsers();
     } catch (error) {
@@ -141,14 +181,12 @@ const ManageUsersPage: React.FC = () => {
     setConfirmAction(action);
     setConfirmDialogOpen(true);
   };
-  
+
   const confirmUserAction = async () => {
     if (!userToManage || !confirmAction) return;
-    
     setActionLoading(userToManage.id);
     setError('');
     setSuccess('');
-    
     try {
       if (confirmAction === 'deactivate') {
         await deactivateUser(userToManage.id);
@@ -171,13 +209,12 @@ const ManageUsersPage: React.FC = () => {
       }
     } catch (error) {
       console.error(`Error ${confirmAction} user:`, error);
-      
       // Spezifischere Fehlermeldungen basierend auf der API-Antwort
       if (error.response?.data?.message) {
         setError(error.response.data.message);
       } else {
         setError(`Fehler beim ${
-          confirmAction === 'deactivate' ? 'Deaktivieren' : 
+          confirmAction === 'deactivate' ? 'Deaktivieren' :
           confirmAction === 'delete' ? 'Löschen' :
           'Reaktivieren'
         } des Benutzers.`);
@@ -187,6 +224,52 @@ const ManageUsersPage: React.FC = () => {
       setUserToManage(null);
       setConfirmAction(null);
       setConfirmDialogOpen(false);
+    }
+  };
+
+  const handleOpenInviteDialog = () => {
+    setOpenInviteDialog(true);
+    setInviteEmail('');
+    setSelectedUser(null);
+  };
+
+  const handleSearchForUser = () => {
+    if (!inviteEmail.trim()) return;
+    
+    const foundUser = allUsers.find(user => 
+      user.email.toLowerCase() === inviteEmail.toLowerCase()
+    );
+    
+    if (foundUser) {
+      setSelectedUser(foundUser);
+      setError('');
+    } else {
+      setSelectedUser(null);
+      setError('Kein Benutzer mit dieser E-Mail-Adresse gefunden');
+    }
+  };
+
+  const handleInviteUser = async () => {
+    if (!selectedUser || !currentLocation) return;
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      await inviteUserToLocation(selectedUser.id, currentLocation.id);
+      setSuccess(`Benutzer "${selectedUser.email}" wurde erfolgreich zu diesem Standort eingeladen.`);
+      setOpenInviteDialog(false);
+      await fetchUsers();
+    } catch (error) {
+      console.error('Error inviting user:', error);
+      if (error.response?.data?.message) {
+        setError(error.response.data.message);
+      } else {
+        setError('Fehler beim Einladen des Benutzers. Möglicherweise ist der Benutzer bereits diesem Standort zugeordnet.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -220,17 +303,54 @@ const ManageUsersPage: React.FC = () => {
         </Alert>
       )}
       
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />}
-          onClick={() => setOpenDialog(true)}
-          disabled={loading}
-        >
-          Neuen Mitarbeiter anlegen
-        </Button>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setOpenDialog(true)}
+            disabled={loading}
+          >
+            Neuen Mitarbeiter anlegen
+          </Button>
+          
+          <Button
+            variant="outlined"
+            startIcon={<PersonAddIcon />}
+            onClick={handleOpenInviteDialog}
+            disabled={loading}
+          >
+            Mitarbeiter einladen
+          </Button>
+        </Box>
+        
+        <FormControl variant="outlined" size="small" sx={{ width: '250px' }}>
+          <OutlinedInput
+            placeholder="E-Mail oder Rolle suchen"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            startAdornment={
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            }
+            endAdornment={
+              searchQuery ? (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    onClick={() => setSearchQuery('')}
+                    edge="end"
+                  >
+                    <ClearIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ) : null
+            }
+          />
+        </FormControl>
       </Box>
-      
+
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="user management tabs">
           <Tab label="Aktive Benutzer" id="user-tab-0" />
@@ -239,7 +359,7 @@ const ManageUsersPage: React.FC = () => {
           )}
         </Tabs>
       </Box>
-      
+
       <TabPanel value={tabValue} index={0}>
         <Paper sx={{ p: 3 }}>
           {loading && (
@@ -249,8 +369,8 @@ const ManageUsersPage: React.FC = () => {
           )}
           
           {!loading && (
-            <TableContainer>
-              <Table>
+            <TableContainer sx={{ maxHeight: '600px', overflow: 'auto' }}>
+              <Table stickyHeader>
                 <TableHead>
                   <TableRow>
                     <TableCell>E-Mail</TableCell>
@@ -260,21 +380,21 @@ const ManageUsersPage: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {users.map((user) => (
+                  {filteredUsers.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
-                        <Chip 
+                        <Chip
                           label={
                             user.role === 'developer' ? 'Entwickler' :
                             user.role === 'lead' ? 'Leitung' :
                             user.role === 'office' ? 'Büro' :
                             'Lehrer'
-                          } 
+                          }
                           color={
-                            user.role === 'developer' ? 'primary' : 
+                            user.role === 'developer' ? 'primary' :
                             user.role === 'lead' ? 'secondary' : 'default'
-                          } 
+                          }
                         />
                       </TableCell>
                       <TableCell>
@@ -283,7 +403,7 @@ const ManageUsersPage: React.FC = () => {
                         ))}
                       </TableCell>
                       <TableCell align="right">
-                        <IconButton 
+                        <IconButton
                           onClick={() => navigate(`/edit-user/${user.id}`)}
                           sx={{ mr: 1 }}
                           disabled={loading || actionLoading === user.id}
@@ -291,7 +411,7 @@ const ManageUsersPage: React.FC = () => {
                           <EditIcon />
                         </IconButton>
                         
-                        <IconButton 
+                        <IconButton
                           onClick={() => handleUserAction(user, 'deactivate')}
                           sx={{ mr: 1 }}
                           disabled={
@@ -308,8 +428,8 @@ const ManageUsersPage: React.FC = () => {
                           )}
                         </IconButton>
                         
-                        {currentUser.role === 'developer' && (
-                          <IconButton 
+                        {currentUser.role === 'developer' || (currentUser.role === 'lead' && user.role !== 'developer' && user.role !== 'lead') && (
+                          <IconButton
                             onClick={() => handleUserAction(user, 'delete')}
                             disabled={
                               user.id === currentUser.id ||
@@ -323,7 +443,8 @@ const ManageUsersPage: React.FC = () => {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {users.length === 0 && (
+                  
+                  {filteredUsers.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={4} align="center">
                         Keine Benutzer gefunden
@@ -336,7 +457,7 @@ const ManageUsersPage: React.FC = () => {
           )}
         </Paper>
       </TabPanel>
-      
+
       {currentUser.role === 'developer' && (
         <TabPanel value={tabValue} index={1}>
           <Paper sx={{ p: 3 }}>
@@ -366,24 +487,24 @@ const ManageUsersPage: React.FC = () => {
                       <TableRow key={user.id}>
                         <TableCell>{user.email}</TableCell>
                         <TableCell>
-                          <Chip 
+                          <Chip
                             label={
                               user.role === 'developer' ? 'Entwickler' :
                               user.role === 'lead' ? 'Leitung' :
                               user.role === 'office' ? 'Büro' :
                               'Lehrer'
-                            } 
+                            }
                             color={
-                              user.role === 'developer' ? 'primary' : 
+                              user.role === 'developer' ? 'primary' :
                               user.role === 'lead' ? 'secondary' : 'default'
-                            } 
+                            }
                           />
                         </TableCell>
                         <TableCell>
                           {user.deactivated_at ? new Date(user.deactivated_at).toLocaleDateString('de-DE') : '-'}
                         </TableCell>
                         <TableCell align="right">
-                          <IconButton 
+                          <IconButton
                             onClick={() => handleUserAction(user, 'reactivate')}
                             sx={{ mr: 1 }}
                             disabled={loading || actionLoading === user.id}
@@ -395,7 +516,7 @@ const ManageUsersPage: React.FC = () => {
                             )}
                           </IconButton>
                           
-                          <IconButton 
+                          <IconButton
                             onClick={() => handleUserAction(user, 'delete')}
                             disabled={loading || actionLoading === user.id}
                           >
@@ -404,6 +525,7 @@ const ManageUsersPage: React.FC = () => {
                         </TableCell>
                       </TableRow>
                     ))}
+                    
                     {deactivatedUsers.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={4} align="center">
@@ -418,7 +540,8 @@ const ManageUsersPage: React.FC = () => {
           </Paper>
         </TabPanel>
       )}
-      
+
+      {/* Dialog: Neuen Mitarbeiter anlegen */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Neuen Mitarbeiter anlegen</DialogTitle>
         <DialogContent>
@@ -447,14 +570,21 @@ const ManageUsersPage: React.FC = () => {
                 )}
               </Select>
             </FormControl>
+            
+            <Typography variant="subtitle1" gutterBottom>
+              Standort: {currentLocation.name}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Der neue Mitarbeiter wird automatisch dem aktuellen Standort zugewiesen.
+            </Typography>
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenDialog(false)} disabled={loading}>
             Abbrechen
           </Button>
-          <Button 
-            variant="contained" 
+          <Button
+            variant="contained"
             onClick={handleCreateUser}
             disabled={!newUser.email || loading}
             startIcon={loading ? <CircularProgress size={20} /> : null}
@@ -463,7 +593,76 @@ const ManageUsersPage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      
+
+      {/* Dialog: Mitarbeiter einladen */}
+      <Dialog open={openInviteDialog} onClose={() => setOpenInviteDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Mitarbeiter zu Standort einladen</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body2" gutterBottom>
+              Geben Sie die E-Mail-Adresse eines bestehenden Mitarbeiters ein, um ihn zu diesem Standort einzuladen.
+            </Typography>
+            
+            <Box sx={{ display: 'flex', gap: 1, mt: 2, mb: 2 }}>
+              <TextField
+                label="E-Mail-Adresse"
+                fullWidth
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                disabled={loading}
+              />
+              <Button
+                variant="outlined"
+                onClick={handleSearchForUser}
+                disabled={loading || !inviteEmail}
+              >
+                Suchen
+              </Button>
+            </Box>
+            
+            {selectedUser && (
+              <Paper variant="outlined" sx={{ p: 2, mt: 2, mb: 2 }}>
+                <Typography variant="subtitle1">Gefundener Benutzer:</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                  <Typography sx={{ mr: 1 }}>{selectedUser.email}</Typography>
+                  <Chip
+                    label={
+                      selectedUser.role === 'developer' ? 'Entwickler' :
+                      selectedUser.role === 'lead' ? 'Leitung' :
+                      selectedUser.role === 'office' ? 'Büro' :
+                      'Lehrer'
+                    }
+                    size="small"
+                    color={
+                      selectedUser.role === 'developer' ? 'primary' :
+                      selectedUser.role === 'lead' ? 'secondary' : 'default'
+                    }
+                  />
+                </Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                  {selectedUser.is_active 
+                    ? 'Benutzer ist aktiv'
+                    : 'Benutzer ist derzeit deaktiviert und wird nach der Einladung reaktiviert.'}
+                </Typography>
+              </Paper>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenInviteDialog(false)} disabled={loading}>
+            Abbrechen
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleInviteUser}
+            disabled={!selectedUser || loading}
+            startIcon={loading ? <CircularProgress size={20} /> : null}
+          >
+            Einladen
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Bestätigungsdialog für Benutzeraktionen */}
       <Dialog
         open={confirmDialogOpen}
@@ -490,24 +689,24 @@ const ManageUsersPage: React.FC = () => {
           </Typography>
           
           <Typography variant="caption" color="error" sx={{ mt: 2, display: 'block' }}>
-            {confirmAction === 'deactivate' && 
+            {confirmAction === 'deactivate' &&
               'Der Benutzer verliert sofort den Zugriff auf das System, kann aber später wieder aktiviert werden.'
             }
-            {confirmAction === 'delete' && 
+            {confirmAction === 'delete' &&
               'WARNUNG: Diese Aktion entfernt den Benutzer permanent und kann nicht rückgängig gemacht werden!'
             }
-            {confirmAction === 'reactivate' && 
+            {confirmAction === 'reactivate' &&
               'Der Benutzer erhält wieder Zugriff auf das System mit seinen vorherigen Berechtigungen.'
             }
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button 
+          <Button
             onClick={() => {
               setConfirmDialogOpen(false);
               setUserToManage(null);
               setConfirmAction(null);
-            }} 
+            }}
             disabled={actionLoading !== null}
           >
             Abbrechen
