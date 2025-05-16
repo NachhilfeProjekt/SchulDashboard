@@ -3,7 +3,7 @@ import axios from 'axios';
 
 // API-Basis-URL richtig konfigurieren
 // Für die lokale Entwicklung und die Render.com-Bereitstellung
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://schuldashboard-backend.onrender.com/api';
 
 // Axios-Instance mit Basis-URL und Standardeinstellungen
 const api = axios.create({
