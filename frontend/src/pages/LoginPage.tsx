@@ -130,6 +130,7 @@ const LoginPage: React.FC = () => {
     setLoading(false);
   }
 };
+
   const handleOfflineMode = () => {
     setLoading(true);
     setError('');
@@ -183,8 +184,20 @@ const LoginPage: React.FC = () => {
   const testBackendConnection = async () => {
     setConnecting(true);
     try {
-      const result = await axios.get('https://dashboard-backend-uweg.onrender.com/health', { timeout: 5000 });
-      console.log('Backend-Verbindungstest:', result.data);
+      // Teste einen allgemeinen API-Endpunkt statt /health
+      const cacheBuster = `?cb=${Date.now()}`;
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://dashboard-backend-uweg.onrender.com/api';
+      
+      // Versuche die Login-URL als Test-Endpunkt
+      const result = await axios.get(`${apiUrl}/auth/login${cacheBuster}`, { 
+        timeout: 5000,
+        validateStatus: function (status) {
+          // Akzeptiere alle Status-Codes unter 500, auch 404 bedeutet, dass der Server erreichbar ist
+          return status < 500;
+        }
+      });
+      
+      console.log('Backend-Verbindungstest:', result.status);
       setNotification(`Verbindung zum Backend erfolgreich (Status: ${result.status})`);
       setOfflineMode(false);
     } catch (error) {
