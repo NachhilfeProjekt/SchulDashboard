@@ -22,10 +22,19 @@ export interface User {
   created_by?: string;
   deactivated_by?: string;
   deactivated_at?: Date;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date;  // Stellt sicher, dass diese Eigenschaften existieren
+  updatedAt: Date;  // Stellt sicher, dass diese Eigenschaften existieren
   temporaryToken?: string;
   temporaryTokenExpires?: Date;
+}
+
+// Hilfsfunktion zum Konvertieren von DB-Ergebnissen in User-Objekte
+export function mapDbUserToUser(dbUser: any): User {
+  return {
+    ...dbUser,
+    createdAt: dbUser.created_at || new Date(),
+    updatedAt: dbUser.updated_at || new Date()
+  };
 }
 
 export interface Location {
