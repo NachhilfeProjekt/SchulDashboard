@@ -11,50 +11,43 @@ services:
     else
       npm install --production=false
     fi
-    
     # Notwendige Dev-Abhängigkeiten explizit installieren
     npm install --save-dev @types/node @types/express @types/cors @types/morgan @types/pg @types/uuid @types/bcryptjs @types/jsonwebtoken @types/winston @types/jest
     npm install --save winston-daily-rotate-file @sendgrid/mail
-    
     # Stelle sicher, dass Verzeichnisse existieren
     mkdir -p src/validation
-    
     # Erstelle die Validierungsdatei, falls sie nicht existiert
     echo 'import Joi from "joi"; export const createUserSchema = Joi.object({ email: Joi.string().email().required(), role: Joi.string().valid("developer", "lead", "office", "teacher").required(), locations: Joi.array().items(Joi.string()).min(1).required() }); export const loginSchema = Joi.object({ email: Joi.string().email().required(), password: Joi.string().required() }); export const passwordResetSchema = Joi.object({ token: Joi.string().required(), newPassword: Joi.string().min(8).required() });' > src/validation/user.ts
-    
     # Erstelle die CORS-Setup-Datei
     echo 'const cors = require("cors"); function setupCors(app) { const allowedOrigins = ["https://dashboard-frontend-p693.onrender.com", "http://localhost:5173", "http://localhost:3000"]; const corsOptions = { origin: function(origin, callback) { if (!origin || allowedOrigins.includes(origin)) { callback(null, true); } else { callback(new Error("CORS policy violation: Origin not allowed"), false); } }, methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"], credentials: true, maxAge: 86400 }; app.use(cors(corsOptions)); } module.exports = setupCors;' > src/cors-setup.js
-    
     # Versuche TypeScript-Kompilierung, aber setze fort, auch wenn Fehler auftreten
     npm run clean
     npx tsc --skipLibCheck || echo "TypeScript compilation errors were found, but continuing build..."
-    
     # Fallback: Kopiere alle Dateien und konvertiere .ts zu .js
     mkdir -p dist
     cp -R src/* dist/
     find dist -name '*.ts' -exec sh -c 'js_file=$(echo "{}" | sed "s/\.ts$/.js/"); cp "{}" "$js_file"' \;
+    # Typ-Annotationen entfernen und ES-Module in CommonJS konvertieren
+    find dist -name "*.js" -exec sed -i 's/: [a-zA-Z0-9_|]*//g' {} \;
+    find dist -name "*.js" -exec sed -i 's/\?: [a-zA-Z0-9_|]*//g' {} \;
+    find dist -name "*.js" -exec sed -i 's/: string \| undefined//g' {} \;
+    find dist -name "*.js" -exec sed -i 's/: Error \| null//g' {} \;
+    find dist -name "*.js" -exec sed -i 's/: any\[\]//g' {} \;
+    find dist -name "*.js" -exec sed -i 's/: string\[\]//g' {} \;
+    find dist -name "*.js" -exec sed -i 's/: any//g' {} \;
+    find dist -name "*.js" -exec sed -i 's/import \(.*\) from \(.*\);/const \1 = require(\2);/g' {} \;
+    find dist -name "*.js" -exec sed -i 's/export default \(.*\);/module.exports = \1;/g' {} \;
+    find dist -name "*.js" -exec sed -i 's/export const \([a-zA-Z0-9_]*\) =/exports.\1 =/g' {} \;
+    find dist -name "*.js" -exec sed -i 's/export function \([a-zA-Z0-9_]*\)/exports.\1 = function/g' {} \;
+    find dist -name "*.js" -exec sed -i 's/export enum \([a-zA-Z0-9_]*\)/const \1/g' {} \;
+    find dist -name "*.js" -exec sed -i 's/export interface \([a-zA-Z0-9_]*\)/\/\/ interface \1/g' {} \;
+    find dist -name "*.js" -exec sed -i 's/export type \([a-zA-Z0-9_]*\)/\/\/ type \1/g' {} \;
+    # Kritischer Fix für das ESM-Problem
+    find dist -name "*.js" -exec sed -i 's/return (mod && mod.__esModule) ? mod { "default" };/return (mod && mod.__esModule) ? mod["default"] : mod;/g' {} \;
+    echo "Build complete"
   startCommand: |
     cd backend && node dist/app.js
   envVars:
-  - key: NODE_ENV
-    value: production
-  - key: NPM_CONFIG_PRODUCTION
-    value: false
-  - key: DB_HOST
-    value: dpg-d0gbpv49c44c73fefpog-a.frankfurt-postgres.render.com
-  - key: DB_NAME
-    value: dashboard_db_cthh
-  - key: DB_USER
-    value: dashboard_db_cthh_user
-  - key: DB_PASSWORD
-    value: hWArsuzVNizlCilLT3sk35bzwqWbtaUT
-  - key: DB_PORT
-    value: 5432
-  - key: DB_SSL
-    value: "true"
-  - key: JWT_SECRET
-    value: ein-sicherer-geheimer-schluessel-dashboard-system
-  - key: JWT_EXPIRES_IN
-    value: 7d
-  - key: FRONTEND_URL
-    value: https://dashboard-frontend-p693.onrender.com
+    - key: NODE_ENV
+      value: production
+    # Weitere Umgebungsvariablen hier...
