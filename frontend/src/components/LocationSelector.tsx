@@ -7,9 +7,9 @@ import { MenuItem, Select, FormControl, InputLabel, SelectChangeEvent, Button, M
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 
-const LocationSelector: React.FC = () => {
+cconst LocationSelector: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { locations, currentLocation } = useSelector((state: RootState) => state.auth);
+  const { locations = [], currentLocation } = useSelector((state: RootState) => state.auth);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
 
