@@ -4,10 +4,12 @@ import axios, { AxiosRequestConfig } from 'axios';
 // Konstante für den Token-Schlüssel
 export const TOKEN_KEY = 'schul_dashboard_token';
 
-// KORRIGIERTE API-URL - ohne /api am Ende
-// const API_URL = import.meta.env.VITE_API_URL || 'https://dashboard-backend-uweg.onrender.com/api';
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://dashboard-backend-uweg.onrender.com';
-const API_URL = `${BASE_URL}/api`; // Explizite Trennung von Basis-URL und API-Pfad
+// KORRIGIERTE API-URL
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://dashboard-backend-uweg.onrender.com/api';
+// Verwende BASE_URL direkt ohne /api anzuhängen
+const API_URL = BASE_URL;
+// Extrahiere die Basis-URL ohne /api für Health-Checks
+const BASE_URL_WITHOUT_API = BASE_URL.replace(/\/api$/, '');
 
 // Verbindungsstatus-Objekt
 export const connectionStatus = {
@@ -50,59 +52,65 @@ export const checkApiConnection = async (): Promise<boolean> => {
   connectionStatus.lastOnlineCheck = now;
   
   try {
-    // Vereinfachte Verbindungsprüfung mit einem direkten Endpunkt
-    console.log("Prüfe Verbindung zum Backend...");
+    // Konstruiere korrekte Health-Check-URL
+    const healthCheckURL = `${BASE_URL_WITHOUT_API}/health`;
     
-    // Verwende nur einen Endpunkt für den Verbindungstest
-    const response = await fetch(`${BASE_URL}/health`, { 
-      method: 'HEAD',  // HEAD ist effizienter als GET für Verbindungstests
-      headers: { 'Cache-Control': 'no-cache' },
-      signal: AbortSignal.timeout(5000)  // 5 Sekunden Timeout
-    });
+    console.log("Prüfe Verbindung zum Backend...", healthCheckURL);
     
-    console.log(`Backend-Antwort: ${response.status}`);
+    // Verbindungsprüfung mit manuellem Timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
     
-    if (response.ok) {
-      console.log('✅ Erfolgreiche Verbindung zum Backend');
+    try {
+      const response = await fetch(healthCheckURL, { 
+        method: 'GET',  // GET statt HEAD, da einige Server HEAD nicht unterstützen
+        headers: { 'Cache-Control': 'no-cache' },
+        signal: controller.signal
+      });
       
-      if (connectionStatus.isOffline) {
-        console.log('Verbindung wiederhergestellt! Wechsle in Online-Modus.');
-        connectionStatus.isOffline = false;
-        connectionStatus.connectionAttempts = 0;
+      clearTimeout(timeoutId);
+      
+      console.log(`Backend-Antwort: ${response.status}`);
+      
+      if (response.ok) {
+        console.log('✅ Erfolgreiche Verbindung zum Backend');
         
-        // Lösche mögliche ausstehende Reconnect-Timer
-        if (connectionStatus.reconnectTimer) {
-          clearTimeout(connectionStatus.reconnectTimer);
-          connectionStatus.reconnectTimer = null;
+        if (connectionStatus.isOffline) {
+          console.log('Verbindung wiederhergestellt! Wechsle in Online-Modus.');
+          connectionStatus.isOffline = false;
+          connectionStatus.connectionAttempts = 0;
+          
+          if (connectionStatus.reconnectTimer) {
+            clearTimeout(connectionStatus.reconnectTimer);
+            connectionStatus.reconnectTimer = null;
+          }
+          
+          window.dispatchEvent(new CustomEvent(CONNECTION_CHANGE_EVENT, { 
+            detail: { isOffline: false } 
+          }));
         }
         
-        // Event auslösen
-        window.dispatchEvent(new CustomEvent(CONNECTION_CHANGE_EVENT, { 
-          detail: { isOffline: false } 
-        }));
+        return true;
+      } else {
+        throw new Error(`Backend antwortet mit Status: ${response.status}`);
       }
-      
-      return true;
-    } else {
-      throw new Error(`Backend antwortet mit Status: ${response.status}`);
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      throw fetchError;
     }
   } catch (error) {
     console.error("Verbindungsfehler:", error);
     
-    // Nur wenn wir nicht bereits im Offline-Modus sind, wechseln wir und benachrichtigen
     if (!connectionStatus.isOffline) {
       console.warn('Backend nicht erreichbar. Wechsle in Offline-Modus.');
       connectionStatus.isOffline = true;
       
-      // Event auslösen
       window.dispatchEvent(new CustomEvent(CONNECTION_CHANGE_EVENT, { 
         detail: { isOffline: true } 
       }));
     }
     
-    // Planung des nächsten Verbindungsversuchs
     scheduleReconnect();
-    
     return false;
   }
 };
@@ -149,6 +157,7 @@ startConnectionCheck();
 // Füge Logging für das API-URL hinzu
 console.log('BASE_URL:', BASE_URL);
 console.log('API_URL:', API_URL);
+console.log('Health-Check URL:', `${BASE_URL_WITHOUT_API}/health`);
 
 // Request Interceptor für das Hinzufügen des Tokens
 api.interceptors.request.use((config) => {
@@ -213,7 +222,7 @@ api.interceptors.response.use(
       });
       
       // Netzwerkfehler - Offline-Modus aktivieren
-      if (error.message.includes('Network Error') || error.message.includes('timeout') || error.code === 'ECONNABORTED') {
+      if (error.message?.includes('Network Error') || error.message?.includes('timeout') || error.code === 'ECONNABORTED') {
         console.log('Netzwerkfehler - Aktiviere Offline-Modus');
         checkApiConnection(); // Dies wird den Offline-Modus aktivieren und Reconnect planen
       }
@@ -229,8 +238,7 @@ api.interceptors.response.use(
 // Timeout für API-Anfragen erhöhen
 api.defaults.timeout = 30000; // 30 Sekunden
 
-// FEHLENDE FUNKTIONEN HINZUFÜGEN
-// Diese Funktionen werden in der Anwendung importiert, aber nicht exportiert
+// ALLE API-FUNKTIONEN
 
 // Funktion zum Abrufen des aktuellen Benutzers
 export const getCurrentUser = async () => {
@@ -254,7 +262,7 @@ export const getUserLocations = async () => {
   }
 };
 
-// Weitere fehlende Funktionen
+// Weitere Funktionen
 export const getLocations = async () => {
   try {
     const response = await api.get('/locations');
