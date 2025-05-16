@@ -64,7 +64,8 @@ router.post('/login', validate(loginSchema), async (req, res) => {
     const locationIds = locations.map(l => l.id);
     
     // Token generieren
-    const token = generateToken(user.id, user.role, locationIds);
+    const token = generateToken(user.id, user.role, user.email, locationIds);
+
     
     logger.info(`Login erfolgreich für Benutzer: ${email}`);
     
@@ -288,14 +289,15 @@ router.get('/current-user', authenticate, async (req, res) => {
     }
     
     // Benutzerdetails ohne sensitive Daten zurückgeben
-    const userDetails = {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      is_active: user.is_active,
-      created_at: user.createdAt,
-      updated_at: user.updatedAt
-    };
+   const userDetails = {
+  id: user.id,
+  email: user.email,
+  role: user.role,
+  is_active: user.is_active,
+  // Hier entweder camelCase oder snake_case verwenden, je nachdem was in der Datenbank existiert
+  created_at: user.created_at || user.createdAt,
+  updated_at: user.updated_at || user.updatedAt
+};
     
     res.json({
       user: userDetails,
