@@ -38,7 +38,7 @@ const Layout = () => {
     
     if (!user || !currentLocation) {
       // Vermeide eine Endlosschleife, indem wir nach zu vielen Versuchen abbrechen
-      if (loadingAttempts >= 3) {
+      if (loadingAttempts >= 2) { // Von 3 auf 2 reduziert für schnellere Offline-Erkennung
         setOfflineMode(true);
         setLoading(false);
         setError('Verbindung zum Server konnte nicht hergestellt werden.');
@@ -52,6 +52,20 @@ const Layout = () => {
             isActive: true
           };
           dispatch(setCurrentLocation(dummyLocation));
+        }
+        
+        // Falls wir einen Token haben, aber keinen Benutzer laden können,
+        // erstellen wir einen Dummy-Benutzer für den Offline-Modus
+        if (!user) {
+          const dummyUser = {
+            id: 'offline-user',
+            email: 'offline@example.com',
+            role: 'developer', // Gewähre volle Rechte im Offline-Modus
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          dispatch(updateUser(dummyUser));
         }
         return;
       }
@@ -127,87 +141,41 @@ const Layout = () => {
     console.log('Current Location:', currentLocation);
   }, [location.pathname, user, currentLocation]);
   
+  // Überprüfe, ob wir automatisch in den Offline-Modus wechseln sollten
+  useEffect(() => {
+    // Nach 5 Sekunden im Ladebildschirm automatisch den Offline-Modus anbieten
+    let timeoutId: NodeJS.Timeout;
+    
+    if (loading && !offlineMode) {
+      timeoutId = setTimeout(() => {
+        if (loading) {
+          setError('Verbindung zum Server dauert lange. Möchten Sie in den Offline-Modus wechseln?');
+        }
+      }, 5000);
+    }
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [loading, offlineMode]);
+  
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column' }}>
         <CircularProgress />
-        <Typography variant="h6" sx={{ ml: 2 }}>
+        <Typography variant="h6" sx={{ mt: 2 }}>
           Laden...
         </Typography>
-      </Box>
-    );
-  }
-  
-  if (offlineMode) {
-    return (
-      <Box sx={{ display: 'flex' }}>
-        <CssBaseline />
-        <Header />
-        <Sidebar />
-        <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-          <Toolbar /> {/* Spacing für Abstand unter Header */}
-          <Alert severity="warning" sx={{ mb: 3 }}>
-            <Typography variant="h6">Offline-Modus</Typography>
-            <Typography variant="body1">
-              Es konnte keine Verbindung zum Server hergestellt werden. Die Anwendung läuft im eingeschränkten Offline-Modus.
-            </Typography>
-            <Button
-              variant="outlined"
-              color="warning"
-              sx={{ mt: 1 }}
-              onClick={() => window.location.reload()}
-            >
-              Erneut versuchen
-            </Button>
-          </Alert>
-          <Outlet /> {/* Hier werden die verschachtelten Routen gerendert */}
-        </Box>
-      </Box>
-    );
-  }
-  
-  if (!user || !currentLocation) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h6">
-          Keine Benutzer- oder Standortdaten vorhanden. <a href="/login" onClick={(e) => {
-            e.preventDefault();
-            localStorage.removeItem('schul_dashboard_token');
-            localStorage.removeItem('schul_dashboard_user');
-            localStorage.removeItem('schul_dashboard_locations');
-            localStorage.removeItem('schul_dashboard_current_location');
-            window.location.href = '/login';
-          }}>Zurück zum Login</a>
-        </Typography>
-      </Box>
-    );
-  }
-  
-  return (
-    <Box sx={{ display: 'flex' }}>
-      <CssBaseline />
-      <Header />
-      <Sidebar />
-      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-        <Toolbar /> {/* Spacing für Abstand unter Header */}
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
-        <Outlet /> {/* Hier werden die verschachtelten Routen gerendert */}
-      </Box>
-      
-      {/* Benachrichtigung über abgelaufene Session */}
-      <Snackbar
-        open={sessionExpired}
-        autoHideDuration={6000}
-        onClose={() => setSessionExpired(false)}
-        message="Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an."
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      />
-    </Box>
-  );
-};
-
-export default Layout;
+          <Box sx={{ mt: 4, maxWidth: 400, textAlign: 'center' }}>
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => {
+                setOfflineMode(true);
+                setLoading(false);
+                
+                // Erst
