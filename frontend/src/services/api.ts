@@ -107,6 +107,17 @@ export const getLocations = async () => {
   return response.data;
 };
 
+// Füge die fehlende Funktion hinzu
+export const getAllLocations = async () => {
+  try {
+    const response = await api.get('/locations');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching all locations:', error);
+    throw error;
+  }
+};
+
 export const getUserLocations = async () => {
   const response = await api.get('/locations/my-locations');
   return response.data;
@@ -133,7 +144,7 @@ export const getButtonsForUser = async (locationId: string) => {
   } catch (error) {
     console.error('Fehler beim Abrufen der Buttons:', error);
     // Fallback für Entwicklungs- oder Testzwecke
-    return [{ 
+    return [{
       id: 'fallback-button-1',
       name: 'Test-Button (Fallback)',
       url: 'https://example.com',
