@@ -27,7 +27,7 @@ app.use(morgan('dev')); // Logging
 
 // CORS konfigurieren
 // Importiere CORS-Setup
-const setupCors = require('./cors-setup');
+import setupCors from './cors-setup';
 setupCors(app);
 
 // Debugging-Middleware zum Loggen von Anfragen
