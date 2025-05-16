@@ -24,8 +24,14 @@ JWT_SECRET=ein-sicherer-geheimer-schluessel-dashboard-system
 JWT_EXPIRES_IN=7d
 FRONTEND_URL=https://dashboard-frontend-p693.onrender.com
 EMAIL_FROM=no-reply@example.com
+INIT_DB=true
+DEBUG=true
 EOF
 fi
+
+# Führe DB-Initialisierung aus
+echo "Führe Datenbankinitialisierung aus..."
+npx ts-node src/scripts/initDatabase.ts || echo "Datenbankinitialisierung fehlgeschlagen, setze Installation fort..."
 
 # TypeScript-Version überprüfen
 echo "TypeScript-Version:"
