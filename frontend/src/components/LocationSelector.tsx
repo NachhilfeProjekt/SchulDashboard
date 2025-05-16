@@ -1,4 +1,4 @@
-// Verbesserte LocationSelector-Komponente (ersetzen Sie die bestehende Datei)
+// frontend/src/components/LocationSelector.tsx
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../store/store';
@@ -7,7 +7,7 @@ import { MenuItem, Select, FormControl, InputLabel, SelectChangeEvent, Button, M
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 
-cconst LocationSelector: React.FC = () => {
+const LocationSelector: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { locations = [], currentLocation } = useSelector((state: RootState) => state.auth);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
@@ -29,7 +29,7 @@ cconst LocationSelector: React.FC = () => {
     handleClose();
   };
 
-  if (locations.length <= 1) return null;
+  if (!locations || locations.length <= 1) return null;
 
   return (
     <Box sx={{ mr: 2 }}>
