@@ -73,4 +73,18 @@ export const sendTemporaryPasswordEmail = async (email: string, tempPassword: st
     text: `Ihr temporäres Passwort lautet: ${tempPassword}. Bitte ändern Sie es sofort nach dem ersten Anmelden.`,
     html: `<p>Ihr temporäres Passwort lautet: <strong>${tempPassword}</strong></p><p>Bitte ändern Sie es sofort nach dem ersten Anmelden.</p>`
   });
+  export const generateToken = (userId: string, role: UserRole, email: string, locations: string[]): string => {
+  const payload = {
+    userId,
+    role,
+    email,
+    locations
+  };
+  
+  return jwt.sign(
+    payload,
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+};
 };
