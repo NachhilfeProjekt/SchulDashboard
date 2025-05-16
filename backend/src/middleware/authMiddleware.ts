@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database';
 import { UserRole } from '../models/User';
+import logger from '../config/logger';
 
 declare global {
   namespace Express {
@@ -20,24 +21,23 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
   const token = req.header('Authorization')?.replace('Bearer ', '');
   
   if (!token) {
-    console.log('Kein Token in der Anfrage gefunden');
+    logger.warn('Kein Token in der Anfrage gefunden');
     return res.status(401).json({ message: 'Authentifizierung erforderlich' });
   }
-
+  
   try {
-    console.log('Versuche Token zu verifizieren');
+    logger.debug('Verifiziere Token');
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
       userId: string;
       role: UserRole;
       locations: string[];
     };
     
-    console.log('Token erfolgreich verifiziert:', decoded);
-    
+    logger.debug(`Token erfolgreich verifiziert für Benutzer-ID: ${decoded.userId}`);
     req.user = decoded;
     next();
   } catch (error) {
-    console.error('Token-Verifizierung fehlgeschlagen:', error);
+    logger.error(`Token-Verifizierung fehlgeschlagen: ${error}`);
     res.status(401).json({ message: 'Ungültiger Token' });
   }
 };
@@ -47,11 +47,12 @@ export const authorize = (roles: string[]) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentifizierung erforderlich' });
     }
-
+    
     if (!roles.includes(req.user.role)) {
+      logger.warn(`Unzureichende Berechtigungen: Benutzer mit Rolle ${req.user.role} versuchte auf eine Ressource zuzugreifen, die für ${roles.join(', ')} reserviert ist`);
       return res.status(403).json({ message: 'Unzureichende Berechtigungen' });
     }
-
+    
     next();
   };
 };
@@ -60,28 +61,28 @@ export const checkLocationAccess = async (req: Request, res: Response, next: Nex
   if (!req.user) {
     return res.status(401).json({ message: 'Authentifizierung erforderlich' });
   }
-
+  
   const locationId = req.params.locationId || req.body.locationId;
   
   if (!locationId) {
     return res.status(400).json({ message: 'Standort-ID ist erforderlich' });
   }
-
-  console.log(`checkLocationAccess: User=${req.user.userId}, Role=${req.user.role}, LocationId=${locationId}`);
-  console.log(`User locations: ${JSON.stringify(req.user.locations)}`);
-
-  // Developers have access to all locations
+  
+  logger.debug(`Prüfe Standortzugriff: Benutzer=${req.user.userId}, Rolle=${req.user.role}, Standort-ID=${locationId}`);
+  logger.debug(`Benutzerstandorte: ${JSON.stringify(req.user.locations)}`);
+  
+  // Entwickler haben Zugriff auf alle Standorte
   if (req.user.role === 'developer') {
-    console.log('User ist Developer - Zugriff erlaubt');
+    logger.debug('Benutzer ist Entwickler - Zugriff erlaubt');
     return next();
   }
-
-  // Check if user has access to this location
+  
+  // Prüfen, ob der Benutzer Zugriff auf diesen Standort hat
   if (!req.user.locations.includes(locationId)) {
-    console.log('User hat keinen Zugriff auf diesen Standort');
+    logger.warn(`Zugriff verweigert: Benutzer hat keinen Zugriff auf Standort ${locationId}`);
     return res.status(403).json({ message: 'Sie haben keinen Zugriff auf diesen Standort' });
   }
-
-  console.log('User hat Zugriff auf diesen Standort');
+  
+  logger.debug(`Benutzer hat Zugriff auf Standort ${locationId}`);
   next();
 };
