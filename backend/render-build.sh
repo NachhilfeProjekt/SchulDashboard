@@ -1,41 +1,24 @@
 #!/bin/bash
 
-# Sicherstellen, dass TypeScript installiert ist
-npm install -g typescript
+# Sicherstellen, dass benötigte Tools installiert sind
+npm install -g typescript rimraf
 
 # Notwendige Abhängigkeiten installieren
 npm install --production=false
-npm install --save-dev @types/node @types/express @types/cors @types/morgan @types/pg @types/uuid @types/bcryptjs @types/jsonwebtoken @types/winston @types/jest
-npm install --save winston-daily-rotate-file @sendgrid/mail
 
-# Erstelle fehlende Verzeichnisse
-mkdir -p src/validation
+# Bereinige das dist-Verzeichnis
+rm -rf dist
+mkdir -p dist
 
-# Stelle sicher, dass die user.ts existiert
-if [ ! -f src/validation/user.ts ]; then
-  echo 'import Joi from "joi";
+# Stelle sicher, dass alle nötigen Verzeichnisse existieren
+mkdir -p src/validation logs
 
-export const createUserSchema = Joi.object({
-  email: Joi.string().email().required(),
-  role: Joi.string().valid("developer", "lead", "office", "teacher").required(),
-  locations: Joi.array().items(Joi.string()).min(1).required()
-});
+# Konvertiere cors-setup.js zu TypeScript, falls noch nicht vorhanden
+if [ -f src/cors-setup.js ] && [ ! -f src/cors-setup.ts ]; then
+  echo 'import cors from "cors";
+import logger from "./config/logger";
 
-export const loginSchema = Joi.object({
-  email: Joi.string().email().required(),
-  password: Joi.string().required()
-});
-
-export const passwordResetSchema = Joi.object({
-  token: Joi.string().required(),
-  newPassword: Joi.string().min(8).required()
-});' > src/validation/user.ts
-fi
-
-# Erstelle cors-setup.js
-echo 'const cors = require("cors");
-
-function setupCors(app) {
+function setupCors(app: any) {
   const allowedOrigins = [
     "https://dashboard-frontend-p693.onrender.com",
     "http://localhost:5173",
@@ -43,10 +26,12 @@ function setupCors(app) {
   ];
 
   const corsOptions = {
-    origin: function(origin, callback) {
+    origin: function(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
       if (!origin || allowedOrigins.includes(origin)) {
+        logger.debug(`CORS: Zugriff erlaubt für Origin: ${origin || "Direkte Anfrage"}`);
         callback(null, true);
       } else {
+        logger.warn(`CORS: Zugriff verweigert für Origin: ${origin}`);
         callback(new Error("CORS policy violation: Origin not allowed"), false);
       }
     },
@@ -56,18 +41,64 @@ function setupCors(app) {
     maxAge: 86400
   };
 
+  app.use((req: any, res: any, next: any) => {
+    logger.debug(`CORS-Anfrage: ${req.method} ${req.url} von Origin: ${req.headers.origin || "Direkte Anfrage"}`);
+    next();
+  });
+
   app.use(cors(corsOptions));
+
+  app.use((err: any, req: any, res: any, next: any) => {
+    if (err.message && err.message.includes("CORS")) {
+      logger.warn(`CORS-Fehler: ${err.message}`);
+      return res.status(403).json({ 
+        message: "CORS-Fehler: Zugriff von dieser Domain ist nicht erlaubt" 
+      });
+    }
+    next(err);
+  });
 }
 
-module.exports = setupCors;' > src/cors-setup.js
+export default setupCors;' > src/cors-setup.ts
+  rm src/cors-setup.js
+fi
 
-# Build mit TypeScript durchführen
-npm run clean
-tsc --skipLibCheck || echo "TypeScript Fehler wurden gefunden, aber der Build wird fortgesetzt..."
+# Kompilieren mit TypeScript
+echo "Kompiliere TypeScript..."
+npx tsc --skipLibCheck
 
-# Fallback: Kopiere alle Dateien und konvertiere .ts zu .js
-mkdir -p dist
-cp -R src/* dist/
-find dist -name '*.ts' -exec sh -c 'js_file=$(echo "{}" | sed "s/\.ts$/.js/"); cp "{}" "$js_file"' \;
+# Erfolg überprüfen
+if [ $? -ne 0 ]; then
+  echo "TypeScript-Kompilierung fehlgeschlagen, versuche Fallback-Methode..."
+  
+  # Fallback: Manuell kopieren und konvertieren
+  cp -R src/* dist/
+  
+  # TypeScript-Dateien zu JavaScript konvertieren
+  find dist -name "*.ts" | while read file; do
+    js_file="${file%.ts}.js"
+    
+    # Konvertiere mit Node.js für bessere Zuverlässigkeit
+    node -e "
+      const fs = require('fs');
+      let content = fs.readFileSync('$file', 'utf8');
+      
+      // Import-Deklarationen konvertieren
+      content = content.replace(/import ([^{]+) from ['\\\"]([^'\\\"]+)['\\\"];?/g, 'const \$1 = require(\"\$2\");');
+      content = content.replace(/import \\{ ([^}]+) \\} from ['\\\"]([^'\\\"]+)['\\\"];?/g, 'const { \$1 } = require(\"\$2\");');
+      content = content.replace(/export const/g, 'exports.');
+      content = content.replace(/export default/g, 'module.exports =');
+      
+      // Typdefinitionen entfernen
+      content = content.replace(/: [A-Za-z<>\\[\\](){}|&]+/g, '');
+      content = content.replace(/\\?: [A-Za-z<>\\[\\](){}|&]+/g, '');
+      
+      fs.writeFileSync('$js_file', content);
+      fs.unlinkSync('$file');
+    "
+  done
+  
+  echo "Fallback-Konvertierung abgeschlossen."
+fi
 
 echo "Build abgeschlossen!"
