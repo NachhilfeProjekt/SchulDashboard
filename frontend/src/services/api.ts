@@ -8,7 +8,7 @@ export const TOKEN_KEY = 'schul_dashboard_token';
 const BASE_URL = import.meta.env.VITE_API_URL || 'https://dashboard-backend-uweg.onrender.com/api';
 // Verwende BASE_URL direkt ohne /api anzuhängen
 const API_URL = BASE_URL;
-// Extrahiere die Basis-URL ohne /api für Health-Checks
+// Extrahiere die Basis-URL ohne /api für API-Checks
 const BASE_URL_WITHOUT_API = BASE_URL.replace(/\/api$/, '');
 
 // Verbindungsstatus-Objekt
@@ -52,28 +52,29 @@ export const checkApiConnection = async (): Promise<boolean> => {
   connectionStatus.lastOnlineCheck = now;
   
   try {
-    // Konstruiere korrekte Health-Check-URL
-    const healthCheckURL = `${BASE_URL_WITHOUT_API}/health`;
+    // Statt dem nicht existierenden Health-Endpunkt einen bekannten API-Endpunkt verwenden
+    // Versuche einen API-Endpunkt, der wahrscheinlich existiert (z.B. für Login)
+    const apiCheckURL = `${API_URL}/auth/login`;
     
-    console.log("Prüfe Verbindung zum Backend...", healthCheckURL);
+    console.log("Prüfe Verbindung zum Backend...", apiCheckURL);
     
     // Verbindungsprüfung mit manuellem Timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
     
     try {
-      const response = await fetch(healthCheckURL, { 
-        method: 'GET',  // GET statt HEAD, da einige Server HEAD nicht unterstützen
+      const response = await fetch(apiCheckURL, { 
+        method: 'HEAD',  // HEAD-Anfrage ist effizient für Verbindungsprüfungen
         headers: { 'Cache-Control': 'no-cache' },
         signal: controller.signal
       });
       
       clearTimeout(timeoutId);
       
-      console.log(`Backend-Antwort: ${response.status}`);
-      
-      if (response.ok) {
-        console.log('✅ Erfolgreiche Verbindung zum Backend');
+      // Auch 404 ist OK - bedeutet, dass der Server erreicht wurde,
+      // auch wenn der spezifische Endpunkt nicht existiert
+      if (response.ok || response.status === 404) {
+        console.log(`✅ Backend erreichbar (Status: ${response.status})`);
         
         if (connectionStatus.isOffline) {
           console.log('Verbindung wiederhergestellt! Wechsle in Online-Modus.');
@@ -157,7 +158,7 @@ startConnectionCheck();
 // Füge Logging für das API-URL hinzu
 console.log('BASE_URL:', BASE_URL);
 console.log('API_URL:', API_URL);
-console.log('Health-Check URL:', `${BASE_URL_WITHOUT_API}/health`);
+console.log('API-Check URL:', `${API_URL}/auth/login`);
 
 // Request Interceptor für das Hinzufügen des Tokens
 api.interceptors.request.use((config) => {
