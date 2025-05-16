@@ -18,10 +18,10 @@ export const generateToken = (userId: string, role: UserRole, locations: string[
   console.log(`Generiere Token mit Payload:`, payload);
   
   return jwt.sign(
-    payload,
-    JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
-  );
+  payload,
+  JWT_SECRET as jwt.Secret,
+  { expiresIn: JWT_EXPIRES_IN }
+);
 };
 
 export const sendPasswordResetEmail = async (email: string): Promise<boolean> => {
