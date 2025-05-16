@@ -1,8 +1,9 @@
 // backend/src/cors-setup.ts
 import cors from 'cors';
+import { Express } from 'express';
 import logger from './config/logger';
 
-function setupCors(app: any) {
+function setupCors(app: Express): void {
   const allowedOrigins = [
     "https://dashboard-frontend-p693.onrender.com",
     "http://localhost:5173",
@@ -27,12 +28,6 @@ function setupCors(app: any) {
     credentials: true,
     maxAge: 86400 // 24 Stunden Cache für Pre-Flight-Anfragen
   };
-  
-  // Protokollierung von CORS-Anfragen aktivieren
-  app.use((req: any, res: any, next: any) => {
-    logger.debug(`CORS-Anfrage: ${req.method} ${req.url} von Origin: ${req.headers.origin || 'Direkte Anfrage'}`);
-    next();
-  });
   
   // CORS mit den definierten Optionen aktivieren
   app.use(cors(corsOptions));
