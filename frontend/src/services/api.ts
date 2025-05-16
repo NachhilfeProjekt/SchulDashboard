@@ -101,6 +101,18 @@ export const getUsers = async (filters = {}) => {
   return response.data;
 };
 
+
+// Benutzer zu Standort einladen
+export const inviteUserToLocation = async (userId: string, locationId: string) => {
+  const response = await api.post('/users/invite', { userId, locationId });
+  return response.data;
+};
+
+// Alle Benutzer abrufen (für die Einladungsfunktion)
+export const getAllUsers = async () => {
+  const response = await api.get('/users/all');
+  return response.data;
+
 export const getUserById = async (id: string) => {
   const response = await api.get(`/users/${id}`);
   return response.data;
