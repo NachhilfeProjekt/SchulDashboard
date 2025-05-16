@@ -65,7 +65,7 @@ pool.connect((err, client, done) => {
 // App initialisieren
 const app = express();
 
-// CORS-Konfiguration hinzufügen
+// CORS-Konfiguration
 const allowedOrigins = [
   'https://dashboard-frontend-p693.onrender.com',
   'http://localhost:5173',
@@ -74,7 +74,7 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    // Wenn kein Origin-Header oder der Origin in der Liste ist
+    // Wenn kein Origin-Header (z.B. bei direkten Aufrufen) oder der Origin ist in der Liste
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
