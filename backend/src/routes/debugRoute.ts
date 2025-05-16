@@ -195,4 +195,118 @@ router.get('/fix-relations', async (req, res) => {
     // Jetzt prüfen wir die Inhalte der Tabellen
     const usersCount = await pool.query('SELECT COUNT(*) FROM users');
     const locationsCount = await pool.query('SELECT COUNT(*) FROM locations');
-    const userLocatio
+    const userLocationsCount = await pool.query('SELECT COUNT(*) FROM user_locations');
+    const buttonsCount = await pool.query('SELECT COUNT(*) FROM custom_buttons');
+    const buttonPermissionsCount = await pool.query('SELECT COUNT(*) FROM button_permissions');
+    
+    res.json({
+      message: 'Datenbank-Tabellen überprüft',
+      tables,
+      counts: {
+        users: parseInt(usersCount.rows[0].count),
+        locations: parseInt(locationsCount.rows[0].count),
+        userLocations: parseInt(userLocationsCount.rows[0].count),
+        buttons: parseInt(buttonsCount.rows[0].count),
+        buttonPermissions: parseInt(buttonPermissionsCount.rows[0].count)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Fehler beim Überprüfen der Datenbank-Relationen',
+      error: error.message
+    });
+  }
+});
+
+// Überprüfung der Datenbankverbindung
+router.get('/db-connection', async (req, res) => {
+  try {
+    const startTime = Date.now();
+    const client = await pool.connect();
+    const result = await client.query('SELECT NOW() as now');
+    const endTime = Date.now();
+    client.release();
+    
+    res.json({
+      status: 'connected',
+      server_time: result.rows[0].now,
+      response_time_ms: endTime - startTime,
+      database_info: {
+        host: process.env.DB_HOST,
+        database: process.env.DB_NAME,
+        port: process.env.DB_PORT,
+        ssl_enabled: process.env.DB_SSL === 'true'
+      }
+    });
+  } catch (error) {
+    logger.error(`Datenbankverbindungsfehler im Debug-Endpunkt: ${error.message}`);
+    res.status(500).json({
+      status: 'error',
+      message: `Datenbankverbindungsfehler: ${error.message}`,
+      error_code: error.code,
+      error_detail: process.env.NODE_ENV === 'production' ? undefined : error.detail
+    });
+  }
+});
+
+// Systeminfo
+router.get('/system', (req, res) => {
+  res.json({
+    node_version: process.version,
+    platform: process.platform,
+    memory: process.memoryUsage(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV,
+    port: process.env.PORT,
+    api_url: process.env.API_URL || 'not set',
+    frontend_url: process.env.FRONTEND_URL
+  });
+});
+
+// Tabellenstatus
+router.get('/tables-status', async (req, res) => {
+  try {
+    const client = await pool.connect();
+    
+    // Get table counts
+    const tableQueries = [
+      'SELECT COUNT(*) FROM users',
+      'SELECT COUNT(*) FROM locations',
+      'SELECT COUNT(*) FROM user_locations',
+      'SELECT COUNT(*) FROM custom_buttons',
+      'SELECT COUNT(*) FROM button_permissions',
+      'SELECT COUNT(*) FROM email_templates',
+      'SELECT COUNT(*) FROM sent_emails',
+      'SELECT COUNT(*) FROM user_activity_log',
+      'SELECT COUNT(*) FROM location_invitations'
+    ];
+    
+    const results = await Promise.all(
+      tableQueries.map(query => client.query(query).catch(err => ({ rows: [{ count: 'ERROR' }], error: err.message })))
+    );
+    
+    client.release();
+    
+    res.json({
+      tables: {
+        users: results[0].rows[0].count,
+        locations: results[1].rows[0].count,
+        user_locations: results[2].rows[0].count,
+        custom_buttons: results[3].rows[0].count,
+        button_permissions: results[4].rows[0].count,
+        email_templates: results[5].rows[0].count,
+        sent_emails: results[6].rows[0].count,
+        user_activity_log: results[7].rows[0].count,
+        location_invitations: results[8].rows[0].count
+      }
+    });
+  } catch (error) {
+    logger.error(`Fehler beim Abrufen der Tabelleninformationen: ${error.message}`);
+    res.status(500).json({
+      status: 'error',
+      message: `Fehler: ${error.message}`
+    });
+  }
+}); // Hier fehlte die schließende geschweifte Klammer
+
+export default router;
