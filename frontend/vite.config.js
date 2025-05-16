@@ -26,7 +26,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  base: '/', // Wichtig für korrektes URL-Routing
+  base: '/',
   build: {
     outDir: 'dist',
     sourcemap: true,
