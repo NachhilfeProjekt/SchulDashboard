@@ -6,7 +6,7 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   currentLocation: Location | null;
-  locations: Location[]; // Locations als Array im State
+  locations: Location[]; // Array für Locations
 }
 
 const initialState: AuthState = {
@@ -14,23 +14,31 @@ const initialState: AuthState = {
   token: localStorage.getItem('schul_dashboard_token'),
   isAuthenticated: !!localStorage.getItem('schul_dashboard_token'),
   currentLocation: JSON.parse(localStorage.getItem('schul_dashboard_current_location') || 'null'),
-  locations: JSON.parse(localStorage.getItem('schul_dashboard_locations') || '[]') // Initialisiere aus localStorage
+  locations: JSON.parse(localStorage.getItem('schul_dashboard_locations') || '[]')
 };
 
-const authSlice = createSlice({
+export const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    // Andere reducer...
-    
+    setCredentials: (state, action: PayloadAction<{ user: User; token: string }>) => {
+      state.user = action.payload.user;
+      state.token = action.payload.token;
+      state.isAuthenticated = true;
+      // Set default location to the first location in the user's locations if available
+      if (action.payload.user.locations && action.payload.user.locations.length > 0) {
+        state.currentLocation = action.payload.user.locations[0];
+      }
+      localStorage.setItem('schul_dashboard_token', action.payload.token);
+    },
     loginSuccess: (state, action: PayloadAction<{ user: User; token: string; locations: Location[] }>) => {
       state.user = action.payload.user;
       state.token = action.payload.token;
       state.isAuthenticated = true;
-      state.locations = action.payload.locations; // Speichere Locations explizit im State
+      state.locations = action.payload.locations || []; // Locations explizit im State speichern
       
       // Setze den Standard-Standort auf den ersten Standort, wenn verfügbar
-      if (action.payload.locations && action.payload.locations.length > 0) {
+      if (action.payload.locations?.length > 0) {
         state.currentLocation = action.payload.locations[0];
       }
       
@@ -38,24 +46,27 @@ const authSlice = createSlice({
       localStorage.setItem('schul_dashboard_token', action.payload.token);
       localStorage.setItem('schul_dashboard_user', JSON.stringify(action.payload.user));
       localStorage.setItem('schul_dashboard_locations', JSON.stringify(action.payload.locations || []));
-      if (action.payload.locations && action.payload.locations.length > 0) {
+      if (action.payload.locations?.length > 0) {
         localStorage.setItem('schul_dashboard_current_location', JSON.stringify(action.payload.locations[0]));
       }
     },
-    
-    // Aktualisiere Locations explizit
+    updateUser: (state, action: PayloadAction<User>) => {
+      state.user = action.payload;
+    },
+    setCurrentLocation: (state, action: PayloadAction<Location>) => {
+      state.currentLocation = action.payload;
+      localStorage.setItem('schul_dashboard_current_location', JSON.stringify(action.payload));
+    },
     updateUserLocations: (state, action: PayloadAction<Location[]>) => {
       state.locations = action.payload;
       localStorage.setItem('schul_dashboard_locations', JSON.stringify(action.payload));
     },
-    
-    // Bei Logout auch Locations zurücksetzen
     logout: (state) => {
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
       state.currentLocation = null;
-      state.locations = []; // Locations zurücksetzen
+      state.locations = [];
       localStorage.removeItem('schul_dashboard_token');
       localStorage.removeItem('schul_dashboard_user');
       localStorage.removeItem('schul_dashboard_current_location');
@@ -64,4 +75,15 @@ const authSlice = createSlice({
   },
 });
 
-export default authSlice.reducer
+// Exportiere die Actions
+export const { 
+  setCredentials, 
+  loginSuccess, 
+  logout, 
+  setCurrentLocation, 
+  updateUserLocations,
+  updateUser
+} = authSlice.actions;
+
+// Exportiere den Reducer
+export default authSlice.reducer;
