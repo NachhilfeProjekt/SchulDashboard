@@ -13,7 +13,8 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "declaration": false,
-    "removeComments": true
+    "removeComments": true,
+    "types": ["node"]  // Diese Zeile hinzufügen
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "**/*.test.ts"]
