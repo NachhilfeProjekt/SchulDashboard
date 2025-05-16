@@ -2,25 +2,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import fs from 'fs';
-
-// Plugin zum Kopieren der staticsitesettings.json
-const copyStaticSiteSettings = () => {
-  return {
-    name: 'copy-static-site-settings',
-    closeBundle() {
-      if (fs.existsSync('./staticsitesettings.json')) {
-        fs.copyFileSync('./staticsitesettings.json', './dist/staticsitesettings.json');
-        console.log('staticsitesettings.json copied to dist/');
-      } else {
-        console.warn('staticsitesettings.json not found!');
-      }
-    }
-  };
-};
 
 export default defineConfig({
-  plugins: [react(), copyStaticSiteSettings()],
+  plugins: [react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -28,7 +12,8 @@ export default defineConfig({
   },
   base: '/',
   build: {
-    outDir: 'dist',
+    // Setze das Ausgabeverzeichnis auf "build"
+    outDir: 'build',
     sourcemap: true,
     rollupOptions: {
       output: {
