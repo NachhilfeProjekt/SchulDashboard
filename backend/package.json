@@ -1,54 +1,43 @@
 {
   "name": "dashboard-backend",
   "version": "1.0.0",
-  "description": "Backend for the Dashboard System",
-  "main": "src/app.ts",
+  "description": "Backend für das Schul-Dashboard",
+  "main": "dist/app.js",
   "scripts": {
-  "start": "node dist/app.js",
-  "build": "tsc",
-  "build-render": "npm install --production=false && npm install --save-dev @types/node @types/express @types/cors @types/morgan @types/pg @types/uuid @types/bcryptjs @types/jsonwebtoken @types/winston @types/jest && npm install --save winston-daily-rotate-file @sendgrid/mail && mkdir -p src/validation && npm run create-validation-file && npm run create-cors-file && npm run compile-ts && npm run fix-esm",
-  "create-validation-file": "echo 'const Joi = require(\"joi\"); exports.createUserSchema = Joi.object({ email: Joi.string().email().required(), role: Joi.string().valid(\"developer\", \"lead\", \"office\", \"teacher\").required(), locations: Joi.array().items(Joi.string()).min(1).required() }); exports.loginSchema = Joi.object({ email: Joi.string().email().required(), password: Joi.string().required() }); exports.passwordResetSchema = Joi.object({ token: Joi.string().required(), newPassword: Joi.string().min(8).required() });' > src/validation/user.js",
-  "create-cors-file": "echo 'const cors = require(\"cors\"); function setupCors(app) { const allowedOrigins = [\"https://dashboard-frontend-p693.onrender.com\", \"http://localhost:5173\", \"http://localhost:3000\"]; const corsOptions = { origin: function(origin, callback) { if (!origin || allowedOrigins.includes(origin)) { callback(null, true); } else { callback(new Error(\"CORS policy violation: Origin not allowed\"), false); } }, methods: [\"GET\", \"POST\", \"PUT\", \"DELETE\", \"PATCH\", \"OPTIONS\"], allowedHeaders: [\"Content-Type\", \"Authorization\", \"X-Requested-With\"], credentials: true, maxAge: 86400 }; app.use(cors(corsOptions)); } module.exports = setupCors;' > src/cors-setup.js",
-  "compile-ts": "npm run clean && tsc --skipLibCheck || echo 'TypeScript compilation errors were found, but continuing build...' && find dist -name '*.js' -exec sed -i 's/return (mod && mod.__esModule) ? mod { \"default\" };/return (mod && mod.__esModule) ? mod[\"default\"] : mod;/g' {} \\;",
-  "clean": "rm -rf dist && mkdir -p dist",
-  "fix-esm": "find dist -name '*.js' -exec sed -i 's/return (mod && mod.__esModule) ? mod { \"default\" };/return (mod && mod.__esModule) ? mod[\"default\"] : mod;/g' {} \\;"
-}
+    "start": "node dist/app.js",
+    "build": "tsc",
+    "dev": "ts-node-dev src/app.ts",
+    "build-render": "tsc --skipLibCheck && node fix-esm.js",
+    "clean": "rm -rf dist && mkdir -p dist",
+    "fix-esm": "node fix-esm.js"
   },
   "dependencies": {
-    "@sendgrid/mail": "^7.7.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
-    "helmet": "^6.1.5",
-    "joi": "^17.12.0",
+    "helmet": "^7.0.0",
+    "joi": "^17.9.2",
     "jsonwebtoken": "^9.0.0",
     "morgan": "^1.10.0",
     "pg": "^8.11.0",
-    "ts-node": "^10.9.1",
     "uuid": "^9.0.0",
-    "winston": "^3.10.0",
-    "winston-daily-rotate-file": "^4.7.1"
+    "winston": "^3.8.2",
+    "winston-daily-rotate-file": "^4.7.1",
+    "@sendgrid/mail": "^7.7.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.2",
     "@types/cors": "^2.8.13",
     "@types/express": "^4.17.17",
-    "@types/helmet": "^4.0.0",
-    "@types/jest": "^29.5.1",
-    "@types/joi": "^17.2.3",
     "@types/jsonwebtoken": "^9.0.2",
     "@types/morgan": "^1.9.4",
-    "@types/node": "^20.4.1",
+    "@types/node": "^18.16.16",
     "@types/pg": "^8.6.6",
     "@types/uuid": "^9.0.1",
     "@types/winston": "^2.4.4",
-    "jest": "^29.7.0",
-    "nodemon": "^2.0.22",
-    "supertest": "^6.3.3",
-    "typescript": "^5.1.6"
-  },
-  "engines": {
-    "node": "18.x"
+    "ts-node": "^10.9.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.0.4"
   }
 }
