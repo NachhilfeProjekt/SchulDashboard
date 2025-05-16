@@ -2,17 +2,16 @@ const cors = require("cors");
 
 function setupCors(app) {
   const allowedOrigins = [
-    "https://dashboard-frontend-p693.onrender.com",
-    "http://localhost:5173",
+    "https://dashboard-frontend-p693.onrender.com", 
+    "http://localhost:5173", 
     "http://localhost:3000"
   ];
-
+  
   console.log('CORS konfiguriert für folgende Origins:', allowedOrigins);
-
+  
   const corsOptions = {
     origin: function(origin, callback) {
       console.log(`CORS check für Origin: ${origin || 'keine Origin (Browser-Anfrage)'}`);
-      
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
@@ -25,7 +24,7 @@ function setupCors(app) {
     credentials: true,
     maxAge: 86400
   };
-
+  
   app.use(cors(corsOptions));
 }
 
