@@ -211,4 +211,62 @@ router.get('/current-user', authenticate, async (req, res) => {
   }
 });
 
+// Debugging: Login-Route mit verbesserter Fehlerbehandlung
+router.post('/login', async (req, res) => {
+  try {
+    console.log('Login-Anfrage erhalten:', { email: req.body.email });
+    
+    const { email, password } = req.body;
+    
+    // Validierung
+    if (!email || !password) {
+      return res.status(400).json({ message: 'E-Mail und Passwort sind erforderlich' });
+    }
+    
+    // Benutzer suchen
+    const user = await getUserByEmail(email);
+    if (!user) {
+      console.log(`Benutzer nicht gefunden: ${email}`);
+      return res.status(401).json({ message: 'Anmeldung fehlgeschlagen. E-Mail oder Passwort falsch.' });
+    }
+
+    // Passwort prüfen
+    const isMatch = await comparePasswords(password, user.password);
+    if (!isMatch) {
+      console.log(`Falsches Passwort für Benutzer: ${email}`);
+      return res.status(401).json({ message: 'Anmeldung fehlgeschlagen. E-Mail oder Passwort falsch.' });
+    }
+
+    // Benutzer gefunden und Passwort korrekt
+    console.log(`Erfolgreiche Anmeldung für Benutzer: ${email}`);
+    
+    try {
+      // Standorte des Benutzers abrufen
+      const locations = await getUserLocations(user.id);
+      const locationIds = locations.map(l => l.id);
+      
+      // Token generieren
+      const token = generateToken(user.id, user.role, locationIds);
+
+      // Antwort senden
+      res.json({
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          locations: locations
+        }
+      });
+    } catch (locationError) {
+      console.error(`Fehler beim Abrufen der Benutzerstandorte: ${locationError}`);
+      res.status(500).json({ message: 'Fehler beim Abrufen der Benutzerstandorte.' });
+    }
+  } catch (error) {
+    console.error(`Login-Fehler: ${error.message || error}`);
+    console.error(error.stack);
+    res.status(500).json({ message: 'Serverfehler bei der Anmeldung.' });
+  }
+});
+
 export default router;
