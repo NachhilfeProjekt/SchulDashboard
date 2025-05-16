@@ -1,9 +1,8 @@
-// frontend/src/pages/LocationManagementPage.tsx
 import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../store/store';
 import { setCurrentLocation } from '../store/authSlice';
-import { getUserLocations, getAllLocations, inviteUserToLocation } from '../services/api';
+import { getUserLocations, getLocations, inviteUserToLocation } from '../services/api';
 import {
   Box, Typography, Paper, List, ListItem, ListItemText, Button,
   Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
@@ -28,7 +27,7 @@ const LocationManagementPage: React.FC = () => {
   const [selectedLocation, setSelectedLocation] = useState<string>('');
   const [userEmail, setUserEmail] = useState('');
   const [role, setRole] = useState<string>('teacher'); // Default role
-  
+
   // Lade Standortdaten beim Komponenten-Mount
   useEffect(() => {
     const fetchData = async () => {
@@ -40,7 +39,7 @@ const LocationManagementPage: React.FC = () => {
         
         // Wenn der Benutzer ein Developer oder Administrator ist, lade alle verfügbaren Standorte
         if (user?.role === 'developer' || user?.role === 'admin') {
-          const allLocations = await getAllLocations();
+          const allLocations = await getLocations(); // Verwende getLocations statt getAllLocations
           // Filtere die Standorte, zu denen der Benutzer noch keinen Zugang hat
           const filteredLocations = allLocations.filter(
             location => !locations.some(userLoc => userLoc.id === location.id)
@@ -57,19 +56,19 @@ const LocationManagementPage: React.FC = () => {
     
     fetchData();
   }, [user]);
-  
+
   // Handler für Tab-Wechsel
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
-  
+
   // Standort wechseln
   const switchLocation = (location: any) => {
     dispatch(setCurrentLocation(location));
     setSuccessMessage(`Standort zu ${location.name} gewechselt.`);
     setTimeout(() => setSuccessMessage(null), 3000);
   };
-  
+
   // Dialog öffnen für Einladung
   const handleOpenInviteDialog = (locationId: string) => {
     setSelectedLocation(locationId);
@@ -77,12 +76,12 @@ const LocationManagementPage: React.FC = () => {
     setRole('teacher');
     setOpenInviteDialog(true);
   };
-  
+
   // Dialog schließen
   const handleCloseInviteDialog = () => {
     setOpenInviteDialog(false);
   };
-  
+
   // Einladung senden
   const handleInvite = async () => {
     if (!selectedLocation || !userEmail || !role) {
@@ -104,7 +103,7 @@ const LocationManagementPage: React.FC = () => {
   const handleRoleChange = (event: SelectChangeEvent) => {
     setRole(event.target.value);
   };
-  
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
@@ -112,10 +111,9 @@ const LocationManagementPage: React.FC = () => {
       </Box>
     );
   }
-  
+
   // Prüfen, ob der Benutzer Zugriff auf die Standortverwaltung hat
   const canManageLocations = user?.role === 'developer' || user?.role === 'admin' || user?.role === 'manager';
-  
   if (!canManageLocations) {
     return (
       <Box sx={{ p: 3 }}>
@@ -123,7 +121,7 @@ const LocationManagementPage: React.FC = () => {
       </Box>
     );
   }
-  
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>Standortverwaltung</Typography>
@@ -162,10 +160,10 @@ const LocationManagementPage: React.FC = () => {
             ) : (
               <List>
                 {userLocations.map((location) => (
-                  <ListItem 
+                  <ListItem
                     key={location.id}
                     secondaryAction={
-                      <Button 
+                      <Button
                         variant={currentLocation?.id === location.id ? "contained" : "outlined"}
                         onClick={() => switchLocation(location)}
                         disabled={currentLocation?.id === location.id}
@@ -174,9 +172,9 @@ const LocationManagementPage: React.FC = () => {
                       </Button>
                     }
                   >
-                    <ListItemText 
-                      primary={location.name} 
-                      secondary={`${location.address || 'Keine Adresse angegeben'}`} 
+                    <ListItemText
+                      primary={location.name}
+                      secondary={`${location.address || 'Keine Adresse angegeben'}`}
                     />
                   </ListItem>
                 ))}
@@ -197,10 +195,10 @@ const LocationManagementPage: React.FC = () => {
             ) : (
               <List>
                 {availableLocations.map((location) => (
-                  <ListItem 
+                  <ListItem
                     key={location.id}
                     secondaryAction={
-                      <Button 
+                      <Button
                         variant="outlined"
                         startIcon={<AddLocationIcon />}
                         onClick={() => handleOpenInviteDialog(location.id)}
@@ -209,9 +207,9 @@ const LocationManagementPage: React.FC = () => {
                       </Button>
                     }
                   >
-                    <ListItemText 
-                      primary={location.name} 
-                      secondary={`${location.address || 'Keine Adresse angegeben'}`} 
+                    <ListItemText
+                      primary={location.name}
+                      secondary={`${location.address || 'Keine Adresse angegeben'}`}
                     />
                   </ListItem>
                 ))}
@@ -229,6 +227,7 @@ const LocationManagementPage: React.FC = () => {
             Geben Sie die E-Mail-Adresse des Mitarbeiters ein, den Sie zu diesem Standort einladen möchten,
             und wählen Sie die entsprechende Rolle aus.
           </DialogContentText>
+          
           <TextField
             autoFocus
             margin="dense"
@@ -241,6 +240,7 @@ const LocationManagementPage: React.FC = () => {
             onChange={(e) => setUserEmail(e.target.value)}
             sx={{ mb: 2, mt: 2 }}
           />
+          
           <FormControl fullWidth>
             <InputLabel id="role-select-label">Rolle</InputLabel>
             <Select
