@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node dist/app.js",
     "dev": "ts-node src/app.ts",
-    "build": "tsc",
+    "build": "tsc --skipLibCheck",
     "clean": "rm -rf dist/*",
     "test": "jest"
   },
