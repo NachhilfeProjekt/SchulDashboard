@@ -1,21 +1,18 @@
 {
   "compilerOptions": {
-    "strict": false,
-    "noImplicitAny": false,
-    "strictNullChecks": false,
-    "esModuleInterop": true,
-    "target": "ES2018",
-    "module": "CommonJS",
+    "target": "es2018",
+    "module": "commonjs",
     "outDir": "./dist",
     "rootDir": "./src",
+    "strict": false,
+    "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
     "resolveJsonModule": true,
-    "declaration": false,
-    "removeComments": true,
-    "types": ["node"]  // Diese Zeile hinzufügen
+    "moduleResolution": "node",
+    "typeRoots": ["./node_modules/@types"],
+    "types": []
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist"]
 }
