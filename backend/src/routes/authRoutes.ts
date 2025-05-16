@@ -1,14 +1,15 @@
 // backend/src/routes/authRoutes.ts
 import express from 'express';
-import { getUserByEmail, comparePasswords, getUserLocations, resetPassword, createUser } from '../models/User';
+import { getUserByEmail, comparePasswords, getUserLocations, resetPassword, createUser, getUserById } from '../models/User';
 import { generateToken, sendPasswordResetEmail, sendTemporaryPasswordEmail } from '../services/authService';
 import { v4 as uuidv4 } from 'uuid';
 import { validate } from '../middleware/validationMiddleware';
 import Joi from 'joi';
 import pool from '../config/database';
 import { authenticate } from '../middleware/authMiddleware';
+import logger from '../config/logger';
 
-// Definiere die Schemas direkt hier, falls der Import nicht funktioniert
+// Schemas für die Validierung
 const loginSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().required()
@@ -27,23 +28,66 @@ const createUserSchema = Joi.object({
 
 const router = express.Router();
 
+// Login-Route mit verbesserter Fehlerbehandlung
 router.post('/login', validate(loginSchema), async (req, res) => {
   try {
+    logger.info(`Login-Versuch für E-Mail: ${req.body.email}`);
     const { email, password } = req.body;
+
+    // Benutzer suchen
     const user = await getUserByEmail(email);
     if (!user) {
-      return res.status(401).json({ message: 'Anmeldung fehlgeschlagen. E-Mail oder Passwort falsch.' });
+      logger.warn(`Login fehlgeschlagen: Benutzer nicht gefunden für E-Mail: ${email}`);
+      return res.status(401).json({ 
+        message: 'Anmeldung fehlgeschlagen. E-Mail oder Passwort falsch.' 
+      });
     }
 
+    // Passwort überprüfen
     const isMatch = await comparePasswords(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Anmeldung fehlgeschlagen. E-Mail oder Passwort falsch.' });
+      logger.warn(`Login fehlgeschlagen: Falsches Passwort für E-Mail: ${email}`);
+      return res.status(401).json({ 
+        message: 'Anmeldung fehlgeschlagen. E-Mail oder Passwort falsch.' 
+      });
     }
 
+    // Standorte des Benutzers abrufen
     const locations = await getUserLocations(user.id);
-    const locationIds = locations.map(l => l.id);
-    const token = generateToken(user.id, user.role, locationIds);
+    if (locations.length === 0) {
+      logger.warn(`Login fehlgeschlagen: Benutzer ${email} hat keine Standorte zugewiesen`);
+      return res.status(403).json({ 
+        message: 'Benutzer hat keine Standorte zugewiesen. Bitte kontaktieren Sie den Administrator.' 
+      });
+    }
 
+    const locationIds = locations.map(l => l.id);
+    
+    // Token generieren
+    const token = generateToken(user.id, user.role, locationIds);
+    
+    logger.info(`Login erfolgreich für Benutzer: ${email}`);
+    
+    // Erfolgreiche Anmeldung protokollieren
+    try {
+      await pool.query(`
+        INSERT INTO user_activity_log 
+        (user_id, action, details) 
+        VALUES ($1, $2, $3)
+      `, [
+        user.id, 
+        'login', 
+        JSON.stringify({ 
+          timestamp: new Date().toISOString(),
+          method: 'password'
+        })
+      ]);
+    } catch (logError) {
+      logger.error(`Fehler beim Protokollieren des Logins: ${logError}`);
+      // Kein Problem, wenn die Protokollierung fehlschlägt
+    }
+
+    // Antwort senden
     res.json({
       token,
       user: {
@@ -54,26 +98,36 @@ router.post('/login', validate(loginSchema), async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(`Login-Fehler: ${error}`);
+    logger.error(`Login-Fehler: ${error.message}`);
+    logger.error(error.stack);
     res.status(500).json({ message: 'Serverfehler bei der Anmeldung.' });
   }
 });
 
+// Passwort-Zurücksetzung anfordern
 router.post('/request-password-reset', async (req, res) => {
   try {
     const { email } = req.body;
+    logger.info(`Passwort-Zurücksetzung angefordert für E-Mail: ${email}`);
+    
     await sendPasswordResetEmail(email);
+    
     // Immer eine positive Antwort geben, um keine Informationen über existierende Konten preiszugeben
-    res.json({ message: 'Falls ein Konto mit dieser E-Mail existiert, wurde eine E-Mail mit Anweisungen zum Zurücksetzen des Passworts gesendet.' });
+    res.json({ 
+      message: 'Falls ein Konto mit dieser E-Mail existiert, wurde eine E-Mail mit Anweisungen zum Zurücksetzen des Passworts gesendet.' 
+    });
   } catch (error) {
-    console.error(`Fehler bei Passwort-Zurücksetzungsanfrage: ${error}`);
+    logger.error(`Fehler bei Passwort-Zurücksetzungsanfrage: ${error}`);
     res.status(500).json({ message: 'Fehler beim Anfordern des Passwort-Zurücksetzens.' });
   }
 });
 
+// Passwort zurücksetzen
 router.post('/reset-password', validate(passwordResetSchema), async (req, res) => {
   try {
     const { token, newPassword } = req.body;
+    logger.info(`Passwort-Zurücksetzung mit Token wird versucht`);
+    
     const success = await resetPassword(token, newPassword);
     
     if (success) {
@@ -104,77 +158,105 @@ router.post('/reset-password', validate(passwordResetSchema), async (req, res) =
               'INSERT INTO user_activity_log (user_id, action, details) VALUES ($1, $2, $3)',
               [userId, 'password_reset', JSON.stringify({ method: 'reset_token' })]
             );
+            
+            logger.info(`Passwort-Zurücksetzung erfolgreich für Benutzer-ID: ${userId}`);
           } catch (logError) {
-            console.error('Error logging password reset:', logError);
+            logger.error('Error logging password reset:', logError);
           }
         }
       } catch (logError) {
-        console.error('Error logging password reset:', logError);
+        logger.error('Error logging password reset:', logError);
         // Fehler bei der Protokollierung sollten den Erfolg nicht beeinflussen
       }
       
       res.json({ message: 'Passwort erfolgreich zurückgesetzt. Sie können sich jetzt anmelden.' });
     } else {
+      logger.warn(`Passwort-Zurücksetzung fehlgeschlagen: Ungültiger oder abgelaufener Token`);
       res.status(400).json({ message: 'Ungültiger oder abgelaufener Token.' });
     }
   } catch (error) {
-    console.error(`Fehler beim Zurücksetzen des Passworts: ${error}`);
+    logger.error(`Fehler beim Zurücksetzen des Passworts: ${error}`);
     res.status(500).json({ message: 'Fehler beim Zurücksetzen des Passworts.' });
   }
 });
 
-// backend/src/routes/authRoutes.ts (Nur die create-user Route)
-router.post('/create-user', validate(createUserSchema), async (req, res) => {
+// Benutzer erstellen
+router.post('/create-user', authenticate, validate(createUserSchema), async (req, res) => {
   try {
     const { email, role, locations } = req.body;
-    const createdBy = req.user?.userId || '11111111-1111-1111-1111-111111111111'; // Default admin ID
-
+    
+    // Stelle sicher, dass nur Entwickler und Leitungen Benutzer erstellen können
+    if (req.user!.role !== 'developer' && req.user!.role !== 'lead') {
+      logger.warn(`Unzureichende Berechtigungen: Benutzer ${req.user!.userId} (${req.user!.role}) versuchte, einen neuen Benutzer zu erstellen`);
+      return res.status(403).json({ message: 'Unzureichende Berechtigungen für diese Aktion.' });
+    }
+    
+    // Wenn ein Leitungsaccount versucht, einen Entwickler zu erstellen
+    if (req.user!.role === 'lead' && role === 'developer') {
+      logger.warn(`Unzureichende Berechtigungen: Leitungsaccount versuchte, einen Entwickler zu erstellen`);
+      return res.status(403).json({ message: 'Leitungsaccounts können keine Entwickler-Accounts erstellen.' });
+    }
+    
+    // Wenn ein Leitungsaccount versucht, einen Benutzer für einen Standort zu erstellen, 
+    // auf den er keinen Zugriff hat
+    if (req.user!.role === 'lead') {
+      const unauthorizedLocations = locations.filter(loc => !req.user!.locations.includes(loc));
+      if (unauthorizedLocations.length > 0) {
+        logger.warn(`Unzureichende Berechtigungen: Leitungsaccount versuchte, Benutzer für nicht zugewiesene Standorte zu erstellen`);
+        return res.status(403).json({ 
+          message: 'Sie können keine Benutzer für Standorte erstellen, auf die Sie keinen Zugriff haben.' 
+        });
+      }
+    }
+    
+    const createdBy = req.user!.userId;
+    
     // Detaillierte Logs für bessere Fehlerbehebung
-    console.log(`Erstelle Benutzer: email=${email}, role=${role}, locations=${JSON.stringify(locations)}, createdBy=${createdBy}`);
-
+    logger.info(`Erstelle Benutzer: email=${email}, role=${role}, locations=${JSON.stringify(locations)}, createdBy=${createdBy}`);
+    
     // Prüfen, ob ein Benutzer mit dieser E-Mail bereits existiert
     try {
       const existingUser = await getUserByEmail(email);
       if (existingUser) {
-        console.log(`E-Mail ${email} existiert bereits`);
+        logger.warn(`Benutzer-Erstellung fehlgeschlagen: E-Mail ${email} existiert bereits`);
         return res.status(400).json({ message: 'Ein Benutzer mit dieser E-Mail existiert bereits.' });
       }
     } catch (checkError) {
-      console.error(`Fehler beim Prüfen der E-Mail-Existenz: ${checkError}`);
+      logger.error(`Fehler beim Prüfen der E-Mail-Existenz: ${checkError}`);
       return res.status(500).json({ message: 'Fehler beim Prüfen der Benutzerexistenz.' });
     }
-
+    
     // Temporäres Passwort generieren
     const tempPassword = uuidv4().split('-')[0]; // Einfaches temporäres Passwort
-    console.log(`Temporäres Passwort generiert für ${email}: [Passwort ausgeblendet für Sicherheit]`);
-
+    logger.info(`Temporäres Passwort generiert für ${email}`);
+    
     try {
       const user = await createUser(email, tempPassword, role, locations, createdBy);
-      console.log(`Benutzer ${email} erfolgreich erstellt mit ID: ${user.id}`);
-
+      logger.info(`Benutzer ${email} erfolgreich erstellt mit ID: ${user.id}`);
+      
       // Temporäres Passwort per E-Mail senden
       try {
         await sendTemporaryPasswordEmail(email, tempPassword);
-        console.log(`Temporäres Passwort erfolgreich per E-Mail an ${email} gesendet`);
+        logger.info(`Temporäres Passwort erfolgreich per E-Mail an ${email} gesendet`);
       } catch (emailError) {
-        console.error(`Fehler beim Senden des temporären Passworts: ${emailError}`);
+        logger.error(`Fehler beim Senden des temporären Passworts: ${emailError}`);
         // Wir geben trotzdem einen Erfolg zurück, warnen aber über das E-Mail-Problem
         return res.status(201).json({
           message: 'Benutzer erfolgreich erstellt, aber das temporäre Passwort konnte nicht per E-Mail versendet werden.',
           userId: user.id
         });
       }
-
+      
       res.status(201).json({
         message: 'Benutzer erfolgreich erstellt. Ein temporäres Passwort wurde per E-Mail versendet.',
         userId: user.id
       });
     } catch (createError) {
-      console.error(`Fehler beim Erstellen des Benutzers: ${createError}`);
+      logger.error(`Fehler beim Erstellen des Benutzers: ${createError}`);
       res.status(500).json({ message: `Fehler beim Erstellen des Benutzers: ${createError.message}` });
     }
   } catch (error) {
-    console.error(`Hauptfehler beim Erstellen des Benutzers: ${error}`);
+    logger.error(`Hauptfehler beim Erstellen des Benutzers: ${error}`);
     res.status(500).json({ message: 'Fehler beim Erstellen des Benutzers.' });
   }
 });
@@ -182,90 +264,46 @@ router.post('/create-user', validate(createUserSchema), async (req, res) => {
 // Get current user and locations (für JWT validation)
 router.get('/current-user', authenticate, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
+    logger.debug(`Abrufen des aktuellen Benutzers: ${userId}`);
     
     // Holen Sie Benutzer-Informationen
-    const userResult = await pool.query('SELECT id, email, role, is_active FROM users WHERE id = $1', [userId]);
-    if (userResult.rows.length === 0) {
+    const user = await getUserById(userId);
+    if (!user) {
+      logger.warn(`Benutzer nicht gefunden mit ID: ${userId}`);
       return res.status(404).json({ message: 'Benutzer nicht gefunden' });
     }
     
-    const user = userResult.rows[0];
+    // Prüfen, ob der Benutzer aktiv ist
+    if (!user.is_active) {
+      logger.warn(`Zugriff verweigert: Benutzer ${userId} ist deaktiviert`);
+      return res.status(403).json({ message: 'Ihr Konto wurde deaktiviert. Bitte kontaktieren Sie den Administrator.' });
+    }
     
     // Holen Sie Standorte des Benutzers
-    const locationsResult = await pool.query(`
-      SELECT l.* FROM locations l
-      JOIN user_locations ul ON l.id = ul.location_id
-      WHERE ul.user_id = $1
-    `, [userId]);
+    const locations = await getUserLocations(userId);
+    if (locations.length === 0 && user.role !== 'developer') {
+      logger.warn(`Benutzer ${userId} hat keine Standorte zugewiesen`);
+      return res.status(403).json({ message: 'Sie haben keine Standorte zugewiesen. Bitte kontaktieren Sie den Administrator.' });
+    }
     
-    const locations = locationsResult.rows;
+    // Benutzerdetails ohne sensitive Daten zurückgeben
+    const userDetails = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      is_active: user.is_active,
+      created_at: user.created_at,
+      updated_at: user.updated_at
+    };
     
     res.json({
-      user,
+      user: userDetails,
       locations
     });
   } catch (error) {
-    console.error('Error getting current user:', error);
+    logger.error('Error getting current user:', error);
     res.status(500).json({ message: 'Fehler beim Abrufen der Benutzerdaten' });
-  }
-});
-
-// Debugging: Login-Route mit verbesserter Fehlerbehandlung
-router.post('/login', async (req, res) => {
-  try {
-    console.log('Login-Anfrage erhalten:', { email: req.body.email });
-    
-    const { email, password } = req.body;
-    
-    // Validierung
-    if (!email || !password) {
-      return res.status(400).json({ message: 'E-Mail und Passwort sind erforderlich' });
-    }
-    
-    // Benutzer suchen
-    const user = await getUserByEmail(email);
-    if (!user) {
-      console.log(`Benutzer nicht gefunden: ${email}`);
-      return res.status(401).json({ message: 'Anmeldung fehlgeschlagen. E-Mail oder Passwort falsch.' });
-    }
-
-    // Passwort prüfen
-    const isMatch = await comparePasswords(password, user.password);
-    if (!isMatch) {
-      console.log(`Falsches Passwort für Benutzer: ${email}`);
-      return res.status(401).json({ message: 'Anmeldung fehlgeschlagen. E-Mail oder Passwort falsch.' });
-    }
-
-    // Benutzer gefunden und Passwort korrekt
-    console.log(`Erfolgreiche Anmeldung für Benutzer: ${email}`);
-    
-    try {
-      // Standorte des Benutzers abrufen
-      const locations = await getUserLocations(user.id);
-      const locationIds = locations.map(l => l.id);
-      
-      // Token generieren
-      const token = generateToken(user.id, user.role, locationIds);
-
-      // Antwort senden
-      res.json({
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          locations: locations
-        }
-      });
-    } catch (locationError) {
-      console.error(`Fehler beim Abrufen der Benutzerstandorte: ${locationError}`);
-      res.status(500).json({ message: 'Fehler beim Abrufen der Benutzerstandorte.' });
-    }
-  } catch (error) {
-    console.error(`Login-Fehler: ${error.message || error}`);
-    console.error(error.stack);
-    res.status(500).json({ message: 'Serverfehler bei der Anmeldung.' });
   }
 });
 
