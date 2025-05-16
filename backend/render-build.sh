@@ -1,43 +1,42 @@
 #!/bin/bash
+set -e
 
-# Bereinige das dist-Verzeichnis
-rm -rf dist
-mkdir -p dist
+# Installiere notwendige Abhängigkeiten
+echo "Installiere Abhängigkeiten für TypeScript-Direktausführung..."
+npm install -g ts-node
 
-# Stelle sicher, dass alle nötigen Verzeichnisse existieren
+# Stelle sicher, dass alle notwendigen Verzeichnisse existieren
 mkdir -p logs
 
-# Kopiere alle Dateien in den dist-Ordner
-cp -R src/* dist/
+# Erstelle eine .env-Datei falls keine existiert
+if [ ! -f .env ]; then
+  echo "Keine .env-Datei gefunden, erstelle eine..."
+  cat > .env << EOF
+PORT=10000
+NODE_ENV=production
+DB_HOST=dpg-d0gbpv49c44c73fefpog-a.frankfurt-postgres.render.com
+DB_NAME=dashboard_db_cthh
+DB_USER=dashboard_db_cthh_user
+DB_PASSWORD=hWArsuzVNizlCilLT3sk35bzwqWbtaUT
+DB_PORT=5432
+DB_SSL=true
+JWT_SECRET=ein-sicherer-geheimer-schluessel-dashboard-system
+JWT_EXPIRES_IN=7d
+FRONTEND_URL=https://dashboard-frontend-p693.onrender.com
+EMAIL_FROM=no-reply@example.com
+EOF
+fi
 
-# Konvertiere TypeScript-Dateien in JavaScript
-echo "Konvertiere TypeScript zu JavaScript..."
-find dist -name "*.ts" -type f | while read file; do
-  js_file="${file%.ts}.js"
-  
-  echo "Konvertiere: $file zu $js_file"
-  
-  # Erstelle eine temporäre Datei
-  temp_file=$(mktemp)
-  
-  # Schrittweise Transformation mit expliziten Patterns
-  # 1. Import-Anweisungen konvertieren
-  sed -E 's/import ([a-zA-Z0-9_]+) from ["'\''"]([^"'\''"]*)["'\''"]/const \1 = require("\2")/' "$file" > "$temp_file"
-  
-  # 2. Import mit geschwungenen Klammern konvertieren
-  sed -E 's/import \{ ([^}]*) \} from ["'\''"]([^"'\''"]*)["'\''"]|")/const { \1 } = require("\2")/' "$temp_file" > "$js_file"
-  
-  # 3. Export-Anweisungen konvertieren
-  sed -E -i 's/export default ([^;]*);?/module.exports = \1;/' "$js_file"
-  sed -E -i 's/export const ([a-zA-Z0-9_]+)/exports.\1/' "$js_file"
-  
-  # 4. TypeScript-Typen entfernen (einfache Fälle)
-  sed -E -i 's/: [a-zA-Z0-9_<>\[\]\(\)\{\}\|&]+//g' "$js_file"
-  sed -E -i 's/\?: [a-zA-Z0-9_<>\[\]\(\)\{\}\|&]+//g' "$js_file"
-  
-  # Bereinige
-  rm "$temp_file"
-  rm "$file"
-done
+# TypeScript-Version überprüfen
+echo "TypeScript-Version:"
+npx tsc --version
 
-echo "Build abgeschlossen!"
+# TS-Node-Version überprüfen
+echo "TS-Node-Version:"
+npx ts-node --version
+
+# Überprüfe TypeScript-Syntax ohne zu kompilieren
+echo "Überprüfe TypeScript-Syntax..."
+npx tsc --noEmit
+
+echo "Setup für TypeScript-Direktausführung abgeschlossen!"
