@@ -10,7 +10,7 @@ import { getCurrentUser, getUserLocations } from '../services/api';
 import { updateUser, setCurrentLocation } from '../store/authSlice';
 
 const Layout = () => {
-  const { user, token, currentLocation } = useSelector((state: RootState) => state.auth);
+  const { user, token, currentLocation, locations = [] } = useSelector((state: RootState) => state.auth);
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
