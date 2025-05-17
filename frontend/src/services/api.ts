@@ -4,9 +4,8 @@ import axios, { AxiosRequestConfig } from 'axios';
 // Konstante für den Token-Schlüssel
 export const TOKEN_KEY = 'schul_dashboard_token';
 
-// KORRIGIERTE API-URL
-const API_URL = import.meta.env.VITE_API_URL || 'https://dashboard-backend-uweg.onrender.com/api';
-// Verwende BASE_URL direkt ohne /api anzuhängen
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://dashboard-backend-uweg.onrender.com/api';
+// Verwende BASE_URL direkt als API_URL
 const API_URL = BASE_URL;
 // Extrahiere die Basis-URL ohne /api für API-Checks
 const BASE_URL_WITHOUT_API = BASE_URL.replace(/\/api$/, '');
