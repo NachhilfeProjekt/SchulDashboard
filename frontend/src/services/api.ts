@@ -65,7 +65,7 @@ export const checkApiConnection = async (): Promise<boolean> => {
     try {
       const response = await fetch(apiCheckURL, { 
         method: 'HEAD',  // HEAD-Anfrage ist effizient für Verbindungsprüfungen
-        headers: { 'Cache-Control': 'no-cache' },
+        headers: {},
         signal: controller.signal
       });
       
