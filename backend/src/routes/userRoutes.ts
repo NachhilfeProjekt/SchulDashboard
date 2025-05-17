@@ -55,7 +55,7 @@ router.get('/location/:locationId', authorize(['developer', 'lead']), checkLocat
   }
 });
 
-// NEW! Get locations for current user
+// Get locations for current user
 router.get('/locations', async (req, res) => {
   try {
     // Für Demo-Modus
@@ -183,7 +183,7 @@ router.get('/:userId/activity-log', authorize(['developer']), async (req, res) =
     }
     
     // Für Demo-Modus
-    if (process.env.DEMO_MODE === 'true') {
+    if (process.env.DEMO_MODE === 'true' || req.params.userId.startsWith('demo-')) {
       return res.json([
         {
           id: "log-1",
@@ -206,6 +206,12 @@ router.get('/:userId/activity-log', authorize(['developer']), async (req, res) =
 // Deactivate a user (only for leads and developers)
 router.post('/:userId/deactivate', authorize(['developer', 'lead']), async (req, res) => {
   try {
+    // Demo-Modus: Simuliere Erfolg für Demo-IDs
+    if (process.env.DEMO_MODE === 'true' || req.params.userId.startsWith('demo-')) {
+      logger.info(`Demo-Modus: Benutzer ${req.params.userId} "deaktiviert"`);
+      return res.json({ message: 'Benutzer erfolgreich deaktiviert.' });
+    }
+    
     // Ensure the user can't deactivate themselves
     if (req.params.userId === req.user.userId) {
       return res.status(400).json({ message: 'Sie können Ihren eigenen Account nicht deaktivieren.' });
@@ -233,6 +239,12 @@ router.post('/:userId/deactivate', authorize(['developer', 'lead']), async (req,
 // Reactivate a user (only for developers)
 router.post('/:userId/reactivate', authorize(['developer']), async (req, res) => {
   try {
+    // Demo-Modus: Simuliere Erfolg für Demo-IDs
+    if (process.env.DEMO_MODE === 'true' || req.params.userId.startsWith('demo-')) {
+      logger.info(`Demo-Modus: Benutzer ${req.params.userId} "reaktiviert"`);
+      return res.json({ message: 'Benutzer erfolgreich reaktiviert.' });
+    }
+    
     const targetUser = await getUserById(req.params.userId);
     if (!targetUser) {
       return res.status(404).json({ message: 'Benutzer nicht gefunden.' });
@@ -253,6 +265,12 @@ router.post('/:userId/reactivate', authorize(['developer']), async (req, res) =>
 // Permanently delete a user (only for developers)
 router.delete('/:userId', authorize(['developer']), async (req, res) => {
   try {
+    // Demo-Modus: Simuliere Erfolg für Demo-IDs
+    if (process.env.DEMO_MODE === 'true' || req.params.userId.startsWith('demo-')) {
+      logger.info(`Demo-Modus: Benutzer ${req.params.userId} "gelöscht"`);
+      return res.json({ message: 'Benutzer erfolgreich gelöscht.' });
+    }
+    
     // Ensure the user can't delete themselves
     if (req.params.userId === req.user.userId) {
       return res.status(400).json({ message: 'Sie können Ihren eigenen Account nicht löschen.' });
@@ -286,6 +304,12 @@ router.post('/invite', authorize(['developer', 'lead']), async (req, res) => {
       return res.status(400).json({ message: 'Benutzer-ID und Standort-ID sind erforderlich' });
     }
     
+    // Demo-Modus: Simuliere Erfolg für Demo-IDs
+    if (process.env.DEMO_MODE === 'true' || userId.startsWith('demo-')) {
+      logger.info(`Demo-Modus: Benutzer ${userId} zum Standort ${locationId} eingeladen`);
+      return res.json({ message: 'Benutzer wurde erfolgreich zum Standort eingeladen' });
+    }
+    
     // Check if user has access to location
     if (req.user.role !== 'developer' && !req.user.locations.includes(locationId)) {
       return res.status(403).json({ message: 'Sie haben keinen Zugriff auf diesen Standort' });
@@ -307,43 +331,6 @@ router.post('/invite', authorize(['developer', 'lead']), async (req, res) => {
     } else {
       res.status(500).json({ message: 'Fehler beim Einladen des Benutzers' });
     }
-  }
-});
-
-// Alle Benutzer abrufen (nur für Entwickler und Leitung)
-router.get('/all', authorize(['developer', 'lead']), async (req, res) => {
-  try {
-    // Für Demo-Modus
-    if (process.env.DEMO_MODE === 'true') {
-      return res.json([
-        {
-          id: "demo-user-1",
-          email: "demo@example.com",
-          role: "developer",
-          is_active: true,
-          locations: [{
-            id: "22222222-2222-2222-2222-222222222222",
-            name: "Hauptstandort"
-          }]
-        },
-        {
-          id: "demo-user-2",
-          email: "teacher@example.com",
-          role: "teacher",
-          is_active: true,
-          locations: [{
-            id: "22222222-2222-2222-2222-222222222222",
-            name: "Hauptstandort"
-          }]
-        }
-      ]);
-    }
-    
-    const users = await getAllUsers();
-    res.json(users);
-  } catch (error) {
-    logger.error('Get all users error:', error);
-    res.status(500).json({ message: 'Fehler beim Abrufen aller Benutzer' });
   }
 });
 
