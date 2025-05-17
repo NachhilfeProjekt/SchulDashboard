@@ -14,7 +14,11 @@ const dbConfig = {
   database: process.env.DB_NAME || 'dashboard_db_cthh',
   password: process.env.DB_PASSWORD || 'hWArsuzVNizlCilLT3sk35bzwqWbtaUT',
   port: parseInt(process.env.DB_PORT || '5432'),
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+  // Verbesserte Pool-Optionen für Render
+  connectionTimeoutMillis: 15000, // 15 Sekunden Verbindungs-Timeout
+  idleTimeoutMillis: 30000,       // 30 Sekunden Inaktivitäts-Timeout
+  max: 10                         // Maximale Anzahl an Verbindungen
 };
 
 export async function initializeDatabase() {
@@ -136,7 +140,7 @@ export async function initializeDatabase() {
       -- Benutzeraktivitätsprotokoll
       CREATE TABLE IF NOT EXISTS user_activity_log (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
         action VARCHAR(50) NOT NULL,
         performed_by UUID REFERENCES users(id) ON DELETE SET NULL,
         performed_at TIMESTAMP DEFAULT NOW(),
@@ -169,7 +173,7 @@ export async function initializeDatabase() {
       const hashedPassword = await bcrypt.hash('admin123', 10);
       
       initialDataSql = `
-        -- Admin-Benutzer einfügen
+        -- Admin-Benutzer einfügen mit fester ID
         INSERT INTO users (id, email, password, role, is_active)
         VALUES (
           '11111111-1111-1111-1111-111111111111',
@@ -179,7 +183,7 @@ export async function initializeDatabase() {
           true
         ) ON CONFLICT (id) DO NOTHING;
         
-        -- Initialer Standort
+        -- Initialer Standort mit fester ID
         INSERT INTO locations (id, name, created_by)
         VALUES (
           '22222222-2222-2222-2222-222222222222',
@@ -212,8 +216,6 @@ export async function initializeDatabase() {
           ('33333333-3333-3333-3333-333333333333', 'lead')
         ON CONFLICT DO NOTHING;
       `;
-    } else {
-      logger.info('Admin-Benutzer existiert bereits, überspringe die Erstellung.');
     }
     
     // Führe Tabellenerstellung aus
@@ -228,9 +230,23 @@ export async function initializeDatabase() {
       logger.info('Initiale Daten erfolgreich eingefügt.');
     }
     
-    // Überprüfen, ob Buttons vorhanden sind
-    const buttonsResult = await pool.query('SELECT COUNT(*) FROM custom_buttons');
-    logger.info(`Anzahl der Buttons in der Datenbank: ${buttonsResult.rows[0].count}`);
+    // Test-Button zum Standard-Standort hinzufügen (wenn noch keine Buttons existieren)
+    const buttonsCount = await pool.query('SELECT COUNT(*) FROM custom_buttons WHERE location_id = $1', 
+      ['22222222-2222-2222-2222-222222222222']);
+    
+    if (parseInt(buttonsCount.rows[0].count) === 0) {
+      logger.info('Keine Buttons für Hauptstandort gefunden, erstelle Beispiel-Buttons...');
+      
+      await pool.query(`
+        INSERT INTO custom_buttons (name, url, location_id, created_by)
+        VALUES 
+          ('Moodle', 'https://moodle.org', '22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111'),
+          ('Google Classroom', 'https://classroom.google.com', '22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111')
+        RETURNING id
+      `);
+      
+      logger.info('Beispiel-Buttons erfolgreich erstellt');
+    }
     
     logger.info('Datenbank-Initialisierung abgeschlossen!');
     return true;
