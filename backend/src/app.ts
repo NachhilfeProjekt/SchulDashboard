@@ -9,12 +9,14 @@ import userRoutes from './routes/userRoutes';
 import locationRoutes from './routes/locationRoutes';
 import buttonRoutes from './routes/buttonRoutes';
 import emailRoutes from './routes/emailRoutes';
+import emailTemplateRoutes from './routes/emailTemplateRoutes'; // Neue Route
 import dotenv from 'dotenv';
 import pool from './config/database';
 import logger from './config/logger';
 import { initializeDatabase } from './scripts/initDatabase';
 import setupCors from './cors-setup';
 import debugRoutes from './routes/debugRoute';
+import jwt from 'jsonwebtoken';
 
 // Lade Umgebungsvariablen
 dotenv.config();
@@ -29,7 +31,10 @@ const app = express();
 // Standard-Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(helmet()); // Sicherheitsheader
+app.use(helmet({ 
+  crossOriginResourcePolicy: false, // Für Entwicklung weniger restriktiv
+  contentSecurityPolicy: false // Für Entwicklung deaktivieren
+})); 
 app.use(morgan('dev')); // Logging
 
 // CORS konfigurieren - erlaube alle Origins im Entwicklungsmodus
@@ -37,7 +42,8 @@ if (process.env.NODE_ENV !== 'production') {
   app.use(cors()); // Im Entwicklungsmodus alle Origins erlauben
   logger.info('CORS: Alle Origins erlaubt (Entwicklungsmodus)');
 } else {
-  setupCors(app); // Ansonsten normale CORS-Konfiguration verwenden
+  app.use(cors()); // Für Fehlerbehebung zunächst alle zulassen
+  logger.info('CORS: Alle Origins erlaubt (vorübergehend für Fehlerbehebung)');
 }
 
 // Debugging-Middleware zum Loggen von Anfragen
@@ -58,7 +64,8 @@ app.get('/health', (req, res) => {
     message: 'Server is running',
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    demoMode: process.env.DEMO_MODE === 'true'
   });
 });
 
@@ -67,8 +74,31 @@ app.get('/api/ping', (req, res) => {
   res.status(200).json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    message: 'Backend is reachable'
+    message: 'Backend is reachable',
+    demoMode: process.env.DEMO_MODE === 'true'
   });
+});
+
+// Token-Debug-Endpoint
+app.post('/api/debug/check-token', (req, res) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  logger.info(`[DEBUG] Token Check: ${token ? 'Token vorhanden' : 'Kein Token'}`);
+  
+  if (token) {
+    logger.info(`[DEBUG] Token Länge: ${token.length}`);
+    logger.info(`[DEBUG] Token Anfang: ${token.substring(0, 20)}...`);
+    
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET as jwt.Secret);
+      logger.info(`[DEBUG] Token gültig, Inhalt: ${JSON.stringify(decoded)}`);
+      res.json({ status: 'valid', decoded });
+    } catch (error) {
+      logger.error(`[DEBUG] Token ungültig: ${error}`);
+      res.json({ status: 'invalid', error: error.message });
+    }
+  } else {
+    res.json({ status: 'missing' });
+  }
 });
 
 // API routes
@@ -77,12 +107,23 @@ app.use('/api/users', userRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/buttons', buttonRoutes);
 app.use('/api/emails', emailRoutes);
+app.use('/api/email-templates', emailTemplateRoutes); // Neue Route für E-Mail-Templates
 
 // Debug-Routes nur in nicht-Produktivumgebungen oder explizit aktiviert
 if (process.env.NODE_ENV !== 'production' || process.env.DEBUG === 'true') {
   app.use('/api/debug', debugRoutes);
   logger.info('Debug-Routen aktiviert');
 }
+
+// Spezielle 404-Behandlung für API-Anfragen
+app.use('/api/*', (req, res) => {
+  logger.warn(`API-Pfad nicht gefunden: ${req.originalUrl}`);
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Der Endpunkt ${req.originalUrl} existiert nicht auf diesem Server.`,
+    demoMode: process.env.DEMO_MODE === 'true'
+  });
+});
 
 // 404-Handler
 app.use(notFound);
