@@ -5,7 +5,7 @@ import axios, { AxiosRequestConfig } from 'axios';
 export const TOKEN_KEY = 'schul_dashboard_token';
 
 // KORRIGIERTE API-URL
-const BASE_URL = 'https://cors-anywhere.herokuapp.com/https://dashboard-backend-uweg.onrender.com/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://dashboard-backend-uweg.onrender.com/api';
 // Verwende BASE_URL direkt ohne /api anzuhängen
 const API_URL = BASE_URL;
 // Extrahiere die Basis-URL ohne /api für API-Checks
