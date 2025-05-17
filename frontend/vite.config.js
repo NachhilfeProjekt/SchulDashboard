@@ -1,3 +1,24 @@
+// frontend/vite.config.js
+import { defineConfig } from 'vite';  // Diese Zeile fehlte
+import react from '@vitejs/plugin-react';
+import path from 'path';
+import fs from 'fs';
+
+// Plugin zum Kopieren der staticsitesettings.json
+const copyStaticSiteSettings = () => {
+  return {
+    name: 'copy-static-site-settings',
+    closeBundle() {
+      if (fs.existsSync('./staticsitesettings.json')) {
+        fs.copyFileSync('./staticsitesettings.json', './build/staticsitesettings.json');
+        console.log('staticsitesettings.json copied to build/');
+      } else {
+        console.warn('staticsitesettings.json not found!');
+      }
+    }
+  };
+};
+
 export default defineConfig({
   plugins: [react(), copyStaticSiteSettings()],
   resolve: {
@@ -19,7 +40,7 @@ export default defineConfig({
       },
     },
   },
-  // Fügen Sie die Proxy-Konfiguration hinzu
+  // Proxy-Konfiguration
   server: {
     proxy: {
       '/api': {
