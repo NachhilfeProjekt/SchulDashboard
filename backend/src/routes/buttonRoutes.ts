@@ -83,6 +83,12 @@ router.post('/:buttonId/permissions', authorize(['developer', 'lead']), async (r
     logger.info(`POST /buttons/${buttonId}/permissions aufgerufen`);
     logger.info(`Permissions: ${JSON.stringify(permissions)}`);
     
+    // Demo-Modus: Erfolg simulieren für Demo-Buttons
+    if (process.env.DEMO_MODE === 'true' && buttonId.startsWith('button-')) {
+      logger.info(`Demo-Modus: Berechtigungen für Button ${buttonId} erfolgreich aktualisiert`);
+      return res.json({ message: 'Berechtigungen erfolgreich aktualisiert.' });
+    }
+    
     await setButtonPermissions(buttonId, permissions);
     logger.info('Berechtigungen erfolgreich aktualisiert');
     
@@ -98,6 +104,12 @@ router.delete('/:buttonId', authorize(['developer', 'lead']), async (req, res) =
   try {
     const { buttonId } = req.params;
     logger.info(`DELETE /buttons/${buttonId} aufgerufen`);
+    
+    // Demo-Modus: Erfolg simulieren für Demo-Buttons
+    if (process.env.DEMO_MODE === 'true' && buttonId.startsWith('button-')) {
+      logger.info(`Demo-Modus: Button ${buttonId} erfolgreich "gelöscht"`);
+      return res.json({ message: 'Button erfolgreich gelöscht.' });
+    }
     
     // Überprüfe, ob der Button existiert und dem User/Location gehört
     const buttonQuery = await pool.query(
