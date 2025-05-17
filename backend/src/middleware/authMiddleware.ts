@@ -1,3 +1,4 @@
+// backend/src/middleware/authMiddleware.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database';
@@ -9,7 +10,7 @@ declare global {
     interface Request {
       user?: {
         userId: string;
-        email: string; // Hinzugefügt
+        email: string; 
         role: UserRole;
         locations: string[];
       };
@@ -18,6 +19,19 @@ declare global {
 }
 
 export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+  // Demo-Modus priorisieren
+  if (process.env.DEMO_MODE === 'true') {
+    // Im Demo-Modus automatisch authentifizieren
+    req.user = {
+      userId: "demo-user-id",
+      email: "demo@example.com",
+      role: "developer",
+      locations: ["22222222-2222-2222-2222-222222222222"]
+    };
+    logger.info('Demo-Modus: Automatische Authentifizierung');
+    return next();
+  }
+
   const token = req.header('Authorization')?.replace('Bearer ', '');
   
   if (!token) {
@@ -43,7 +57,6 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
   }
 };
 
-// Diese Funktion war möglicherweise nicht korrekt exportiert
 export const authorize = (roles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
@@ -59,7 +72,6 @@ export const authorize = (roles: string[]) => {
   };
 };
 
-// Diese Funktion war möglicherweise nicht korrekt exportiert
 export const checkLocationAccess = async (req: Request, res: Response, next: NextFunction) => {
   if (!req.user) {
     return res.status(401).json({ message: 'Authentifizierung erforderlich' });
@@ -80,8 +92,14 @@ export const checkLocationAccess = async (req: Request, res: Response, next: Nex
     return next();
   }
   
+  // Im Demo-Modus immer Zugriff erlauben
+  if (process.env.DEMO_MODE === 'true') {
+    logger.debug('Demo-Modus - Zugriff erlaubt');
+    return next();
+  }
+  
   // Prüfen, ob der Benutzer Zugriff auf diesen Standort hat
-  if (!req.user.locations.includes(locationId)) {
+  if (!req.user.locations.includes(locationId) && locationId !== 'default-location') {
     logger.warn(`Zugriff verweigert: Benutzer hat keinen Zugriff auf Standort ${locationId}`);
     return res.status(403).json({ message: 'Sie haben keinen Zugriff auf diesen Standort' });
   }
