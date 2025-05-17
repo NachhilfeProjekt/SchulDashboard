@@ -10,9 +10,11 @@ import {
   getDeactivatedUsers,
   getUserActivityLog,
   inviteUserToLocation,
-  getAllUsers
+  getAllUsers,
+  getUserLocations
 } from '../models/User';
 import pool from '../config/database';
+import logger from '../config/logger';
 
 const router = express.Router();
 
@@ -21,17 +23,72 @@ router.use(authenticate);
 // Get users for a specific location
 router.get('/location/:locationId', authorize(['developer', 'lead']), checkLocationAccess, async (req, res) => {
   try {
-    const users = await getUsersByLocation(req.params.locationId);
+    // Für Demo-Modus
+    if (process.env.DEMO_MODE === 'true') {
+      // Demo-Benutzer zurückgeben
+      return res.json([
+        {
+          id: "demo-user-1",
+          email: "teacher@example.com",
+          role: "teacher",
+          is_active: true
+        },
+        {
+          id: "demo-user-2",
+          email: "office@example.com",
+          role: "office",
+          is_active: true
+        }
+      ]);
+    }
+    
+    // Handle default-location Sonderfall
+    const locationId = req.params.locationId === 'default-location' 
+      ? '22222222-2222-2222-2222-222222222222' 
+      : req.params.locationId;
+    
+    const users = await getUsersByLocation(locationId);
     res.json(users);
   } catch (error) {
-    console.error('Get users by location error:', error);
+    logger.error('Get users by location error:', error);
     res.status(500).json({ message: 'Fehler beim Abrufen der Benutzer.' });
+  }
+});
+
+// NEW! Get locations for current user
+router.get('/locations', async (req, res) => {
+  try {
+    // Für Demo-Modus
+    if (process.env.DEMO_MODE === 'true') {
+      return res.json([
+        {
+          id: "22222222-2222-2222-2222-222222222222",
+          name: "Hauptstandort"
+        }
+      ]);
+    }
+    
+    const locations = await getUserLocations(req.user.userId);
+    res.json(locations);
+  } catch (error) {
+    logger.error('Get user locations error:', error);
+    res.status(500).json({ message: 'Fehler beim Abrufen der Benutzer-Standorte.' });
   }
 });
 
 // Get current user info
 router.get('/me', async (req, res) => {
   try {
+    // Für Demo-Modus
+    if (process.env.DEMO_MODE === 'true') {
+      return res.json({
+        id: "demo-user-id",
+        email: req.user.email || "demo@example.com",
+        role: req.user.role || "developer",
+        is_active: true
+      });
+    }
+    
     const user = await getUserById(req.user.userId);
     if (!user) {
       return res.status(404).json({ message: 'Benutzer nicht gefunden.' });
@@ -40,7 +97,7 @@ router.get('/me', async (req, res) => {
     const { password, temporaryToken, temporaryTokenExpires, ...userData } = user;
     res.json(userData);
   } catch (error) {
-    console.error('Get user error:', error);
+    logger.error('Get user error:', error);
     res.status(500).json({ message: 'Fehler beim Abrufen der Benutzerdaten.' });
   }
 });
@@ -48,11 +105,61 @@ router.get('/me', async (req, res) => {
 // Get deactivated users (only for developers)
 router.get('/deactivated', authorize(['developer']), async (req, res) => {
   try {
+    // Für Demo-Modus
+    if (process.env.DEMO_MODE === 'true') {
+      return res.json([
+        {
+          id: "demo-deactivated-1",
+          email: "deactivated@example.com",
+          role: "teacher",
+          is_active: false,
+          deactivated_at: new Date()
+        }
+      ]);
+    }
+    
     const users = await getDeactivatedUsers();
     res.json(users);
   } catch (error) {
-    console.error('Get deactivated users error:', error);
+    logger.error('Get deactivated users error:', error);
     res.status(500).json({ message: 'Fehler beim Abrufen der deaktivierten Benutzer.' });
+  }
+});
+
+// Get all users (für die Benutzerverwaltung)
+router.get('/', authorize(['developer', 'lead']), async (req, res) => {
+  try {
+    // Für Demo-Modus
+    if (process.env.DEMO_MODE === 'true') {
+      return res.json([
+        {
+          id: "demo-user-1",
+          email: "demo@example.com",
+          role: "developer",
+          is_active: true,
+          locations: [{
+            id: "22222222-2222-2222-2222-222222222222",
+            name: "Hauptstandort"
+          }]
+        },
+        {
+          id: "demo-user-2",
+          email: "teacher@example.com",
+          role: "teacher",
+          is_active: true,
+          locations: [{
+            id: "22222222-2222-2222-2222-222222222222",
+            name: "Hauptstandort"
+          }]
+        }
+      ]);
+    }
+    
+    const users = await getAllUsers();
+    res.json(users);
+  } catch (error) {
+    logger.error('Get all users error:', error);
+    res.status(500).json({ message: 'Fehler beim Abrufen aller Benutzer.' });
   }
 });
 
@@ -72,13 +179,26 @@ router.get('/:userId/activity-log', authorize(['developer']), async (req, res) =
         )
       `);
     } catch (tableError) {
-      console.error('Error checking/creating activity log table:', tableError);
+      logger.error('Error checking/creating activity log table:', tableError);
+    }
+    
+    // Für Demo-Modus
+    if (process.env.DEMO_MODE === 'true') {
+      return res.json([
+        {
+          id: "log-1",
+          user_id: req.params.userId,
+          action: "login",
+          performed_at: new Date(),
+          details: { method: "password" }
+        }
+      ]);
     }
     
     const activityLog = await getUserActivityLog(req.params.userId);
     res.json(activityLog);
   } catch (error) {
-    console.error('Get user activity log error:', error);
+    logger.error('Get user activity log error:', error);
     res.status(500).json({ message: 'Fehler beim Abrufen des Benutzeraktivitätsprotokolls.' });
   }
 });
@@ -105,7 +225,7 @@ router.post('/:userId/deactivate', authorize(['developer', 'lead']), async (req,
     await deactivateUser(req.params.userId, req.user.userId);
     res.json({ message: 'Benutzer erfolgreich deaktiviert.' });
   } catch (error) {
-    console.error('Deactivate user error:', error);
+    logger.error('Deactivate user error:', error);
     res.status(500).json({ message: 'Fehler beim Deaktivieren des Benutzers.' });
   }
 });
@@ -125,7 +245,7 @@ router.post('/:userId/reactivate', authorize(['developer']), async (req, res) =>
     await reactivateUser(req.params.userId, req.user.userId);
     res.json({ message: 'Benutzer erfolgreich reaktiviert.' });
   } catch (error) {
-    console.error('Reactivate user error:', error);
+    logger.error('Reactivate user error:', error);
     res.status(500).json({ message: 'Fehler beim Reaktivieren des Benutzers.' });
   }
 });
@@ -151,7 +271,7 @@ router.delete('/:userId', authorize(['developer']), async (req, res) => {
       res.status(500).json({ message: 'Fehler beim Löschen des Benutzers.' });
     }
   } catch (error) {
-    console.error('Delete user error:', error);
+    logger.error('Delete user error:', error);
     res.status(500).json({ message: 'Fehler beim Löschen des Benutzers.' });
   }
 });
@@ -171,12 +291,17 @@ router.post('/invite', authorize(['developer', 'lead']), async (req, res) => {
       return res.status(403).json({ message: 'Sie haben keinen Zugriff auf diesen Standort' });
     }
     
+    // Handle default-location Sonderfall
+    const actualLocationId = locationId === 'default-location' 
+      ? '22222222-2222-2222-2222-222222222222' 
+      : locationId;
+    
     // Invite user
-    await inviteUserToLocation(userId, locationId);
+    await inviteUserToLocation(userId, actualLocationId);
     
     res.json({ message: 'Benutzer wurde erfolgreich zum Standort eingeladen' });
   } catch (error) {
-    console.error('Invite user error:', error);
+    logger.error('Invite user error:', error);
     if (error.message) {
       res.status(400).json({ message: error.message });
     } else {
@@ -188,10 +313,36 @@ router.post('/invite', authorize(['developer', 'lead']), async (req, res) => {
 // Alle Benutzer abrufen (nur für Entwickler und Leitung)
 router.get('/all', authorize(['developer', 'lead']), async (req, res) => {
   try {
+    // Für Demo-Modus
+    if (process.env.DEMO_MODE === 'true') {
+      return res.json([
+        {
+          id: "demo-user-1",
+          email: "demo@example.com",
+          role: "developer",
+          is_active: true,
+          locations: [{
+            id: "22222222-2222-2222-2222-222222222222",
+            name: "Hauptstandort"
+          }]
+        },
+        {
+          id: "demo-user-2",
+          email: "teacher@example.com",
+          role: "teacher",
+          is_active: true,
+          locations: [{
+            id: "22222222-2222-2222-2222-222222222222",
+            name: "Hauptstandort"
+          }]
+        }
+      ]);
+    }
+    
     const users = await getAllUsers();
     res.json(users);
   } catch (error) {
-    console.error('Get all users error:', error);
+    logger.error('Get all users error:', error);
     res.status(500).json({ message: 'Fehler beim Abrufen aller Benutzer' });
   }
 });
