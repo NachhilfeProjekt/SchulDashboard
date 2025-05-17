@@ -1,5 +1,5 @@
 // backend/src/routes/emailRoutes.ts
-import express, { Request, Response } from 'express';
+import express from 'express';
 import { authenticate, authorize, checkLocationAccess } from '../middleware/authMiddleware';
 import { getEmailTemplates, createEmailTemplate, sendBulkEmails, resendFailedEmails } from '../models/User';
 import pool from '../config/database';
@@ -15,10 +15,30 @@ router.use(authenticate);
  * @desc E-Mail-Vorlagen für einen Standort abrufen
  * @access Private
  */
-router.get('/templates/location/:locationId', checkLocationAccess, async (req: Request, res: Response) => {
+router.get('/templates/location/:locationId', checkLocationAccess, async (req, res) => {
   try {
     logger.info(`Abrufen von E-Mail-Vorlagen für Standort: ${req.params.locationId}`);
-    const templates = await getEmailTemplates(req.params.locationId);
+    
+    // Demo-Modus: Beispiel-Vorlagen zurückgeben
+    if (process.env.DEMO_MODE === 'true') {
+      return res.json([
+        {
+          id: "template-1",
+          name: "Willkommens-E-Mail",
+          subject: "Willkommen im System",
+          body: "Hallo {{name}}, wir begrüßen Sie herzlich!",
+          location_id: req.params.locationId,
+          created_at: new Date().toISOString()
+        }
+      ]);
+    }
+    
+    // Handle default-location Sonderfall
+    const locationId = req.params.locationId === 'default-location' 
+      ? '22222222-2222-2222-2222-222222222222' 
+      : req.params.locationId;
+      
+    const templates = await getEmailTemplates(locationId);
     
     logger.debug(`${templates.length} E-Mail-Vorlagen gefunden`);
     res.json(templates);
@@ -36,7 +56,7 @@ router.get('/templates/location/:locationId', checkLocationAccess, async (req: R
  * @desc Neue E-Mail-Vorlage erstellen
  * @access Private - nur für Leads und Entwickler
  */
-router.post('/templates', authorize(['developer', 'lead']), async (req: Request, res: Response) => {
+router.post('/templates', authorize(['developer', 'lead']), async (req, res) => {
   try {
     const { name, subject, body, locationId } = req.body;
     
@@ -47,13 +67,30 @@ router.post('/templates', authorize(['developer', 'lead']), async (req: Request,
       });
     }
     
+    // Demo-Modus: Erfolg simulieren
+    if (process.env.DEMO_MODE === 'true') {
+      return res.status(201).json({
+        id: `template-${Date.now()}`,
+        name,
+        subject,
+        body,
+        location_id: locationId,
+        created_at: new Date().toISOString()
+      });
+    }
+    
     logger.info(`Erstelle neue E-Mail-Vorlage: ${name} für Standort ${locationId}`);
+    
+    // Handle default-location Sonderfall
+    const actualLocationId = locationId === 'default-location' 
+      ? '22222222-2222-2222-2222-222222222222' 
+      : locationId;
     
     const template = await createEmailTemplate(
       name, 
       subject, 
       body, 
-      locationId, 
+      actualLocationId, 
       req.user.userId
     );
     
@@ -73,7 +110,7 @@ router.post('/templates', authorize(['developer', 'lead']), async (req: Request,
  * @desc Massenversand von E-Mails
  * @access Private - nur für Leads und Entwickler
  */
-router.post('/send-bulk', authorize(['developer', 'lead']), async (req: Request, res: Response) => {
+router.post('/send-bulk', authorize(['developer', 'lead']), async (req, res) => {
   try {
     const { recipients, templateId } = req.body;
     
@@ -84,6 +121,14 @@ router.post('/send-bulk', authorize(['developer', 'lead']), async (req: Request,
     
     if (!templateId) {
       return res.status(400).json({ message: 'Vorlagen-ID erforderlich' });
+    }
+    
+    // Demo-Modus: Erfolg simulieren
+    if (process.env.DEMO_MODE === 'true') {
+      return res.json({
+        message: 'E-Mails werden versendet.',
+        count: recipients.length
+      });
     }
     
     // Prüfen, ob die E-Mail im Benutzerobjekt vorhanden ist
@@ -126,17 +171,13 @@ router.post('/send-bulk', authorize(['developer', 'lead']), async (req: Request,
 });
 
 /**
- * @route GET /api/emails/sent
+ * @route GET /api/emails/sent/location/:locationId
  * @desc Gesendete E-Mails für einen Standort abrufen
  * @access Private
  */
-router.get('/sent', async (req: Request, res: Response) => {
+router.get('/sent/location/:locationId', checkLocationAccess, async (req, res) => {
   try {
-    const locationId = req.query.locationId as string;
-    
-    if (!locationId) {
-      return res.status(400).json({ message: 'Standort-ID ist erforderlich' });
-    }
+    const locationId = req.params.locationId;
 
     // Überprüfen, ob der Benutzer Zugriff auf diesen Standort hat
     if (req.user?.role !== 'developer' && !req.user?.locations.includes(locationId)) {
@@ -144,14 +185,34 @@ router.get('/sent', async (req: Request, res: Response) => {
       return res.status(403).json({ message: 'Sie haben keinen Zugriff auf diesen Standort' });
     }
 
-    logger.info(`Abrufen gesendeter E-Mails für Standort ${locationId}`);
+    // Demo-Modus: Beispiel-E-Mails zurückgeben
+    if (process.env.DEMO_MODE === 'true') {
+      return res.json([
+        {
+          id: "email-sent-1",
+          recipient_email: "empfaenger@example.com",
+          recipient_name: "Max Mustermann",
+          subject: "Willkommen im System",
+          status: "sent",
+          location_id: locationId,
+          sent_at: new Date().toISOString()
+        }
+      ]);
+    }
+
+    // Handle default-location Sonderfall
+    const actualLocationId = locationId === 'default-location' 
+      ? '22222222-2222-2222-2222-222222222222' 
+      : locationId;
+    
+    logger.info(`Abrufen gesendeter E-Mails für Standort ${actualLocationId}`);
     
     const query = `
       SELECT * FROM sent_emails
       WHERE location_id = $1
       ORDER BY sent_at DESC`;
     
-    const result = await pool.query(query, [locationId]);
+    const result = await pool.query(query, [actualLocationId]);
     
     logger.debug(`${result.rows.length} gesendete E-Mails gefunden`);
     res.json(result.rows);
@@ -169,12 +230,20 @@ router.get('/sent', async (req: Request, res: Response) => {
  * @desc Fehlgeschlagene E-Mails erneut senden
  * @access Private - nur für Leads und Entwickler
  */
-router.post('/resend', authorize(['developer', 'lead']), async (req: Request, res: Response) => {
+router.post('/resend', authorize(['developer', 'lead']), async (req, res) => {
   try {
     const { emailIds } = req.body;
     
     if (!Array.isArray(emailIds) || emailIds.length === 0) {
       return res.status(400).json({ message: 'Gültige E-Mail-IDs sind erforderlich' });
+    }
+    
+    // Demo-Modus: Erfolg simulieren
+    if (process.env.DEMO_MODE === 'true') {
+      return res.json({
+        message: 'E-Mails werden erneut versendet.',
+        count: emailIds.length
+      });
     }
     
     logger.info(`Erneutes Senden von ${emailIds.length} E-Mails angefordert`);
@@ -220,95 +289,6 @@ router.post('/resend', authorize(['developer', 'lead']), async (req: Request, re
     logger.error(`Fehler beim erneuten Senden der E-Mails: ${error}`);
     res.status(500).json({ 
       message: 'Fehler beim erneuten Versenden der E-Mails.',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-/**
- * @route DELETE /api/emails/templates/:templateId
- * @desc E-Mail-Vorlage löschen
- * @access Private - nur für Leads und Entwickler
- */
-router.delete('/templates/:templateId', authorize(['developer', 'lead']), async (req: Request, res: Response) => {
-  try {
-    const { templateId } = req.params;
-    
-    // Überprüfen, ob die Vorlage existiert und Benutzer Zugriff hat
-    const templateQuery = `
-      SELECT * FROM email_templates 
-      WHERE id = $1
-    `;
-    
-    const templateResult = await pool.query(templateQuery, [templateId]);
-    
-    if (templateResult.rows.length === 0) {
-      logger.warn(`E-Mail-Vorlage mit ID ${templateId} nicht gefunden`);
-      return res.status(404).json({ message: 'E-Mail-Vorlage nicht gefunden' });
-    }
-    
-    const template = templateResult.rows[0];
-    
-    // Überprüfen, ob der Benutzer Zugriff auf den Standort hat
-    if (req.user.role !== 'developer' && !req.user.locations.includes(template.location_id)) {
-      logger.warn(`Zugriff verweigert: Benutzer ${req.user.userId} hat keinen Zugriff auf Standort ${template.location_id}`);
-      return res.status(403).json({ 
-        message: 'Sie haben keinen Zugriff auf diese E-Mail-Vorlage' 
-      });
-    }
-    
-    // E-Mail-Vorlage löschen
-    await pool.query('DELETE FROM email_templates WHERE id = $1', [templateId]);
-    
-    logger.info(`E-Mail-Vorlage ${templateId} erfolgreich gelöscht`);
-    res.json({ message: 'E-Mail-Vorlage erfolgreich gelöscht' });
-  } catch (error) {
-    logger.error(`Fehler beim Löschen der E-Mail-Vorlage: ${error}`);
-    res.status(500).json({ 
-      message: 'Fehler beim Löschen der E-Mail-Vorlage.',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-/**
- * @route GET /api/emails/templates/:templateId
- * @desc Details einer E-Mail-Vorlage abrufen
- * @access Private
- */
-router.get('/templates/:templateId', async (req: Request, res: Response) => {
-  try {
-    const { templateId } = req.params;
-    
-    // E-Mail-Vorlage abrufen
-    const templateQuery = `
-      SELECT * FROM email_templates 
-      WHERE id = $1
-    `;
-    
-    const templateResult = await pool.query(templateQuery, [templateId]);
-    
-    if (templateResult.rows.length === 0) {
-      logger.warn(`E-Mail-Vorlage mit ID ${templateId} nicht gefunden`);
-      return res.status(404).json({ message: 'E-Mail-Vorlage nicht gefunden' });
-    }
-    
-    const template = templateResult.rows[0];
-    
-    // Überprüfen, ob der Benutzer Zugriff auf den Standort hat
-    if (req.user.role !== 'developer' && !req.user.locations.includes(template.location_id)) {
-      logger.warn(`Zugriff verweigert: Benutzer ${req.user.userId} hat keinen Zugriff auf Standort ${template.location_id}`);
-      return res.status(403).json({ 
-        message: 'Sie haben keinen Zugriff auf diese E-Mail-Vorlage' 
-      });
-    }
-    
-    logger.info(`E-Mail-Vorlage ${templateId} erfolgreich abgerufen`);
-    res.json(template);
-  } catch (error) {
-    logger.error(`Fehler beim Abrufen der E-Mail-Vorlage: ${error}`);
-    res.status(500).json({ 
-      message: 'Fehler beim Abrufen der E-Mail-Vorlage.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
