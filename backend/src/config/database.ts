@@ -1,5 +1,5 @@
 // backend/src/config/database.ts
-import { Pool } from 'pg';
+import { Pool, PoolConfig } from 'pg';
 import dotenv from 'dotenv';
 import logger from './logger';
 
@@ -10,17 +10,17 @@ dotenv.config();
 logger.info(`Datenbank-Konfiguration: Host: ${process.env.DB_HOST}, DB: ${process.env.DB_NAME}, User: ${process.env.DB_USER}, SSL: ${process.env.DB_SSL === 'true' ? 'Enabled' : 'Disabled'}`);
 
 // Konfiguration aus Umgebungsvariablen
-const dbConfig = {
+const dbConfig: PoolConfig = {
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
   port: parseInt(process.env.DB_PORT || '5432'),
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-  // Verbindungspooling-Optionen
-  max: 20, // maximale Anzahl von Clients im Pool
-  idleTimeoutMillis: 30000, // wie lange ein Client im Pool inaktiv bleiben kann bevor er freigegeben wird
-  connectionTimeoutMillis: 10000, // wie lange auf eine Verbindung gewartet werden soll - erhöht für langsame Netzwerke
+  // Verbindungspooling-Optionen - angepasst für Render Free-Tier
+  max: 10,                        // Reduziert für Free-Tier
+  idleTimeoutMillis: 30000,       // 30 Sekunden inaktiv
+  connectionTimeoutMillis: 15000, // 15 Sekunden Verbindungs-Timeout
 };
 
 // Erstellen eines Connection Pools
@@ -47,6 +47,8 @@ setInterval(async () => {
     
     try {
       const client = await pool.connect();
+      // Keep-Alive-Query ausführen
+      await client.query('SELECT 1');
       if (!dbStatus.isConnected) {
         logger.info('Datenbankverbindung wiederhergestellt');
       }
@@ -56,10 +58,20 @@ setInterval(async () => {
     } catch (err) {
       dbStatus.isConnected = false;
       dbStatus.connectionAttempts++;
-      logger.error(`Datenbankverbindungsfehler (Versuch ${dbStatus.connectionAttempts}): ${err.message}`);
+      
+      // Nur alle 5 Versuche loggen, um Log-Spam zu vermeiden
+      if (dbStatus.connectionAttempts % 5 === 1) {
+        logger.error(`Datenbankverbindungsfehler (Versuch ${dbStatus.connectionAttempts}): ${err.message}`);
+      }
+      
+      // Bei anhaltenden Verbindungsproblemen Demo-Modus aktivieren
+      if (dbStatus.connectionAttempts > 10 && process.env.DEMO_MODE !== 'true') {
+        process.env.DEMO_MODE = 'true';
+        logger.warn('DEMO_MODE automatisch aktiviert nach 10 fehlgeschlagenen DB-Verbindungsversuchen');
+      }
     }
   }
-}, 10000); // Alle 10 Sekunden prüfen
+}, 50000); // Alle 50 Sekunden prüfen (unter der 60-Sekunden-Inaktivitätsschwelle von Render)
 
 // Test der Datenbankverbindung
 const testDatabase = async () => {
@@ -84,6 +96,10 @@ const testDatabase = async () => {
       logger.error(`Datenbank "${process.env.DB_NAME}" existiert nicht.`);
     }
     
+    // Demo-Modus aktivieren bei Datenbankfehlern
+    process.env.DEMO_MODE = 'true';
+    logger.warn('DEMO_MODE aktiviert aufgrund von Datenbankverbindungsproblemen');
+    
     return false;
   } finally {
     if (client) client.release();
@@ -95,7 +111,7 @@ testDatabase().then(success => {
   if (success) {
     logger.info('Datenbank ist bereit für Anfragen.');
   } else {
-    logger.warn('Datenbank ist nicht verfügbar! Die Anwendung wird versuchen, sich später zu verbinden.');
+    logger.warn('Datenbank ist nicht verfügbar! Die Anwendung wechselt in den Demo-Modus.');
   }
 });
 
