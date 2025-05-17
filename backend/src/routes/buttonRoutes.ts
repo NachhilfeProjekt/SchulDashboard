@@ -3,6 +3,7 @@ import express from 'express';
 import { authenticate, authorize, checkLocationAccess } from '../middleware/authMiddleware';
 import { createCustomButton, getButtonsForUser, setButtonPermissions, deleteButton } from '../models/User';
 import pool from '../config/database';
+import logger from '../config/logger';
 
 const router = express.Router();
 
@@ -11,16 +12,45 @@ router.use(authenticate);
 // Get buttons for current user at a specific location
 router.get('/location/:locationId', checkLocationAccess, async (req, res) => {
   try {
-    console.log(`GET /buttons/location/${req.params.locationId} aufgerufen`);
-    console.log(`User: ${JSON.stringify(req.user)}`);
+    logger.info(`GET /buttons/location/${req.params.locationId} aufgerufen`);
+    logger.info(`User: ${JSON.stringify(req.user)}`);
     
-    const buttons = await getButtonsForUser(req.user.userId, req.params.locationId);
-    console.log(`Buttons gefunden: ${buttons.length}`);
+    // DEMO-MODUS: Beispiel-Buttons zurückgeben
+    if (process.env.DEMO_MODE === 'true') {
+      return res.json([
+        {
+          id: "button-1",
+          name: "Moodle",
+          url: "https://moodle.org",
+          location_id: req.params.locationId
+        },
+        {
+          id: "button-2",
+          name: "Google Classroom",
+          url: "https://classroom.google.com",
+          location_id: req.params.locationId
+        }
+      ]);
+    }
+    
+    // Handle default-location Sonderfall
+    const locationId = req.params.locationId === 'default-location' 
+      ? '22222222-2222-2222-2222-222222222222' 
+      : req.params.locationId;
+    
+    logger.info(`Suche Buttons für Standort: ${locationId} und Benutzer: ${req.user.userId}`);
+    
+    const buttons = await getButtonsForUser(req.user.userId, locationId);
+    logger.info(`Buttons gefunden: ${buttons.length}`);
     
     res.json(buttons);
   } catch (error) {
-    console.error('Get buttons error:', error);
-    res.status(500).json({ message: 'Fehler beim Abrufen der Buttons.' });
+    logger.error('Get buttons error:', error);
+    logger.error(error.stack);
+    res.status(500).json({ 
+      message: 'Fehler beim Abrufen der Buttons.',
+      details: process.env.NODE_ENV !== 'production' ? error.message : undefined
+    });
   }
 });
 
@@ -28,14 +58,19 @@ router.get('/location/:locationId', checkLocationAccess, async (req, res) => {
 router.post('/', authorize(['developer', 'lead']), async (req, res) => {
   try {
     const { name, url, locationId } = req.body;
-    console.log(`POST /buttons aufgerufen mit name=${name}, url=${url}, locationId=${locationId}`);
+    logger.info(`POST /buttons aufgerufen mit name=${name}, url=${url}, locationId=${locationId}`);
     
-    const button = await createCustomButton(name, url, locationId, req.user.userId);
-    console.log(`Button erstellt: ${JSON.stringify(button)}`);
+    // Handle default-location Sonderfall
+    const actualLocationId = locationId === 'default-location' 
+      ? '22222222-2222-2222-2222-222222222222' 
+      : locationId;
+    
+    const button = await createCustomButton(name, url, actualLocationId, req.user.userId);
+    logger.info(`Button erstellt: ${JSON.stringify(button)}`);
     
     res.status(201).json(button);
   } catch (error) {
-    console.error('Create button error:', error);
+    logger.error('Create button error:', error);
     res.status(500).json({ message: 'Fehler beim Erstellen des Buttons.' });
   }
 });
@@ -45,24 +80,24 @@ router.post('/:buttonId/permissions', authorize(['developer', 'lead']), async (r
   try {
     const { buttonId } = req.params;
     const { permissions } = req.body;
-    console.log(`POST /buttons/${buttonId}/permissions aufgerufen`);
-    console.log(`Permissions: ${JSON.stringify(permissions)}`);
+    logger.info(`POST /buttons/${buttonId}/permissions aufgerufen`);
+    logger.info(`Permissions: ${JSON.stringify(permissions)}`);
     
     await setButtonPermissions(buttonId, permissions);
-    console.log('Berechtigungen erfolgreich aktualisiert');
+    logger.info('Berechtigungen erfolgreich aktualisiert');
     
     res.json({ message: 'Berechtigungen erfolgreich aktualisiert.' });
   } catch (error) {
-    console.error('Set button permissions error:', error);
+    logger.error('Set button permissions error:', error);
     res.status(500).json({ message: 'Fehler beim Aktualisieren der Button-Berechtigungen.' });
   }
 });
 
-// NEUE ROUTE: Delete button (only for leads and developers)
+// Delete button (only for leads and developers)
 router.delete('/:buttonId', authorize(['developer', 'lead']), async (req, res) => {
   try {
     const { buttonId } = req.params;
-    console.log(`DELETE /buttons/${buttonId} aufgerufen`);
+    logger.info(`DELETE /buttons/${buttonId} aufgerufen`);
     
     // Überprüfe, ob der Button existiert und dem User/Location gehört
     const buttonQuery = await pool.query(
@@ -81,23 +116,14 @@ router.delete('/:buttonId', authorize(['developer', 'lead']), async (req, res) =
       return res.status(403).json({ message: 'Sie haben keinen Zugriff auf diesen Button.' });
     }
     
-    // Lösche zuerst die Berechtigungen des Buttons
-    await pool.query(
-      'DELETE FROM button_permissions WHERE button_id = $1',
-      [buttonId]
-    );
+    // Button löschen mit Modell-Funktion
+    await deleteButton(buttonId);
     
-    // Lösche dann den Button
-    await pool.query(
-      'DELETE FROM custom_buttons WHERE id = $1',
-      [buttonId]
-    );
-    
-    console.log(`Button ${buttonId} erfolgreich gelöscht`);
+    logger.info(`Button ${buttonId} erfolgreich gelöscht`);
     
     res.json({ message: 'Button erfolgreich gelöscht.' });
   } catch (error) {
-    console.error('Delete button error:', error);
+    logger.error('Delete button error:', error);
     res.status(500).json({ message: 'Fehler beim Löschen des Buttons.' });
   }
 });
