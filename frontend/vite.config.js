@@ -1,10 +1,5 @@
-// frontend/vite.config.js
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
-
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), copyStaticSiteSettings()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -12,7 +7,6 @@ export default defineConfig({
   },
   base: '/',
   build: {
-    // Setze das Ausgabeverzeichnis auf "build"
     outDir: 'build',
     sourcemap: true,
     rollupOptions: {
@@ -24,6 +18,16 @@ export default defineConfig({
         },
       },
     },
+  },
+  // Fügen Sie die Proxy-Konfiguration hinzu
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://dashboard-backend-uweg.onrender.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
+      }
+    }
   },
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom', 'react-redux', '@mui/material'],
