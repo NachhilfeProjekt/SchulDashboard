@@ -34,6 +34,23 @@ router.post('/login', validate(loginSchema), async (req, res) => {
     logger.info(`Login-Versuch für E-Mail: ${req.body.email}`);
     const { email, password } = req.body;
 
+    // DEMO-MODUS: Für das Frontend-Testing immer erfolgreich anmelden
+    if (process.env.DEMO_MODE === 'true') {
+      logger.info(`DEMO-MODUS: Automatische Anmeldung für ${email}`);
+      return res.json({
+        token: "demo-token-1234567890",
+        user: {
+          id: "demo-user-id",
+          email: email,
+          role: "developer",
+          locations: [{
+            id: "22222222-2222-2222-2222-222222222222",
+            name: "Hauptstandort"
+          }]
+        }
+      });
+    }
+
     // Benutzer suchen
     const user = await getUserByEmail(email);
     if (!user) {
@@ -102,6 +119,39 @@ router.post('/login', validate(loginSchema), async (req, res) => {
     logger.error(`Login-Fehler: ${error.message}`);
     logger.error(error.stack);
     res.status(500).json({ message: 'Serverfehler bei der Anmeldung.' });
+  }
+});
+
+// NEUER ENDPUNKT: Aktuellen Benutzer abrufen (/me)
+router.get('/me', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    logger.info(`Abrufen des aktuellen Benutzers mit ID: ${userId}`);
+    
+    // DEMO-MODUS: Demo-Daten zurückgeben
+    if (process.env.DEMO_MODE === 'true') {
+      return res.json({
+        id: "demo-user-id",
+        email: req.user.email || "demo@example.com",
+        role: req.user.role || "developer",
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date()
+      });
+    }
+    
+    const user = await getUserById(userId);
+    if (!user) {
+      logger.warn(`Benutzer mit ID ${userId} nicht gefunden`);
+      return res.status(404).json({ message: 'Benutzer nicht gefunden' });
+    }
+    
+    // Benutzerdaten ohne sensible Informationen zurückgeben
+    const { password, temporaryToken, temporaryTokenExpires, ...userData } = user;
+    res.json(userData);
+  } catch (error) {
+    logger.error(`Fehler beim Abrufen des aktuellen Benutzers: ${error}`);
+    res.status(500).json({ message: 'Fehler beim Abrufen des aktuellen Benutzers' });
   }
 });
 
@@ -181,92 +231,29 @@ router.post('/reset-password', validate(passwordResetSchema), async (req, res) =
   }
 });
 
-// Benutzer erstellen
-router.post('/create-user', authenticate, validate(createUserSchema), async (req, res) => {
-  try {
-    const { email, role, locations } = req.body;
-    
-    // Stelle sicher, dass nur Entwickler und Leitungen Benutzer erstellen können
-    if (req.user!.role !== 'developer' && req.user!.role !== 'lead') {
-      logger.warn(`Unzureichende Berechtigungen: Benutzer ${req.user!.userId} (${req.user!.role}) versuchte, einen neuen Benutzer zu erstellen`);
-      return res.status(403).json({ message: 'Unzureichende Berechtigungen für diese Aktion.' });
-    }
-    
-    // Wenn ein Leitungsaccount versucht, einen Entwickler zu erstellen
-    if (req.user!.role === 'lead' && role === 'developer') {
-      logger.warn(`Unzureichende Berechtigungen: Leitungsaccount versuchte, einen Entwickler zu erstellen`);
-      return res.status(403).json({ message: 'Leitungsaccounts können keine Entwickler-Accounts erstellen.' });
-    }
-    
-    // Wenn ein Leitungsaccount versucht, einen Benutzer für einen Standort zu erstellen, 
-    // auf den er keinen Zugriff hat
-    if (req.user!.role === 'lead') {
-      const unauthorizedLocations = locations.filter(loc => !req.user!.locations.includes(loc));
-      if (unauthorizedLocations.length > 0) {
-        logger.warn(`Unzureichende Berechtigungen: Leitungsaccount versuchte, Benutzer für nicht zugewiesene Standorte zu erstellen`);
-        return res.status(403).json({ 
-          message: 'Sie können keine Benutzer für Standorte erstellen, auf die Sie keinen Zugriff haben.' 
-        });
-      }
-    }
-    
-    const createdBy = req.user!.userId;
-    
-    // Detaillierte Logs für bessere Fehlerbehebung
-    logger.info(`Erstelle Benutzer: email=${email}, role=${role}, locations=${JSON.stringify(locations)}, createdBy=${createdBy}`);
-    
-    // Prüfen, ob ein Benutzer mit dieser E-Mail bereits existiert
-    try {
-      const existingUser = await getUserByEmail(email);
-      if (existingUser) {
-        logger.warn(`Benutzer-Erstellung fehlgeschlagen: E-Mail ${email} existiert bereits`);
-        return res.status(400).json({ message: 'Ein Benutzer mit dieser E-Mail existiert bereits.' });
-      }
-    } catch (checkError) {
-      logger.error(`Fehler beim Prüfen der E-Mail-Existenz: ${checkError}`);
-      return res.status(500).json({ message: 'Fehler beim Prüfen der Benutzerexistenz.' });
-    }
-    
-    // Temporäres Passwort generieren
-    const tempPassword = uuidv4().split('-')[0]; // Einfaches temporäres Passwort
-    logger.info(`Temporäres Passwort generiert für ${email}`);
-    
-    try {
-      const user = await createUser(email, tempPassword, role, locations, createdBy);
-      logger.info(`Benutzer ${email} erfolgreich erstellt mit ID: ${user.id}`);
-      
-      // Temporäres Passwort per E-Mail senden
-      try {
-        await sendTemporaryPasswordEmail(email, tempPassword);
-        logger.info(`Temporäres Passwort erfolgreich per E-Mail an ${email} gesendet`);
-      } catch (emailError) {
-        logger.error(`Fehler beim Senden des temporären Passworts: ${emailError}`);
-        // Wir geben trotzdem einen Erfolg zurück, warnen aber über das E-Mail-Problem
-        return res.status(201).json({
-          message: 'Benutzer erfolgreich erstellt, aber das temporäre Passwort konnte nicht per E-Mail versendet werden.',
-          userId: user.id
-        });
-      }
-      
-      res.status(201).json({
-        message: 'Benutzer erfolgreich erstellt. Ein temporäres Passwort wurde per E-Mail versendet.',
-        userId: user.id
-      });
-    } catch (createError) {
-      logger.error(`Fehler beim Erstellen des Benutzers: ${createError}`);
-      res.status(500).json({ message: `Fehler beim Erstellen des Benutzers: ${createError.message}` });
-    }
-  } catch (error) {
-    logger.error(`Hauptfehler beim Erstellen des Benutzers: ${error}`);
-    res.status(500).json({ message: 'Fehler beim Erstellen des Benutzers.' });
-  }
-});
-
 // Get current user and locations (für JWT validation)
 router.get('/current-user', authenticate, async (req, res) => {
   try {
     const userId = req.user!.userId;
     logger.debug(`Abrufen des aktuellen Benutzers: ${userId}`);
+    
+    // DEMO-MODUS: Demo-Daten zurückgeben
+    if (process.env.DEMO_MODE === 'true') {
+      return res.json({
+        user: {
+          id: "demo-user-id",
+          email: req.user.email || "demo@example.com",
+          role: req.user.role || "developer",
+          is_active: true,
+          created_at: new Date(),
+          updated_at: new Date()
+        },
+        locations: [{
+          id: "22222222-2222-2222-2222-222222222222",
+          name: "Hauptstandort"
+        }]
+      });
+    }
     
     // Holen Sie Benutzer-Informationen
     const user = await getUserById(userId);
