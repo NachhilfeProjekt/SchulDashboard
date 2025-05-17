@@ -19,6 +19,10 @@ import debugRoutes from './routes/debugRoute';
 // Lade Umgebungsvariablen
 dotenv.config();
 
+// DEMO-MODUS aktivieren, wenn kein DB-Zugriff möglich ist
+process.env.DEMO_MODE = process.env.DEMO_MODE || 'true';
+logger.info(`DEMO_MODE ist ${process.env.DEMO_MODE === 'true' ? 'AKTIVIERT' : 'DEAKTIVIERT'}`);
+
 // Express-App initialisieren
 const app = express();
 
@@ -28,8 +32,13 @@ app.use(express.urlencoded({ extended: false }));
 app.use(helmet()); // Sicherheitsheader
 app.use(morgan('dev')); // Logging
 
-// CORS konfigurieren
-setupCors(app);
+// CORS konfigurieren - erlaube alle Origins im Entwicklungsmodus
+if (process.env.NODE_ENV !== 'production') {
+  app.use(cors()); // Im Entwicklungsmodus alle Origins erlauben
+  logger.info('CORS: Alle Origins erlaubt (Entwicklungsmodus)');
+} else {
+  setupCors(app); // Ansonsten normale CORS-Konfiguration verwenden
+}
 
 // Debugging-Middleware zum Loggen von Anfragen
 app.use((req, res, next) => {
@@ -53,45 +62,12 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Datenbank-Verbindungstest-Endpunkt
-app.get('/api/db-test', async (req, res) => {
-  try {
-    const client = await pool.connect();
-    const result = await client.query('SELECT NOW() as time');
-    client.release();
-    res.json({ 
-      status: 'success', 
-      message: 'Database connected', 
-      time: result.rows[0].time,
-      env: {
-        dbHost: process.env.DB_HOST,
-        dbName: process.env.DB_NAME,
-        dbPort: process.env.DB_PORT,
-        useSSL: process.env.DB_SSL
-      }
-    });
-  } catch (err) {
-    logger.error(`Database connection test failed: ${err.message}`);
-    res.status(500).json({ 
-      status: 'error', 
-      message: `Database connection failed: ${err.message}`,
-      stack: process.env.NODE_ENV === 'production' ? undefined : err.stack
-    });
-  }
-});
-
-// API-Tests-Endpunkt
-app.get('/api/test', async (req, res) => {
-  res.json({
-    message: 'API is working',
+// Ping-Endpoint für Frontend-Verbindungsprüfung
+app.get('/api/ping', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
     timestamp: new Date().toISOString(),
-    apiEndpoints: {
-      auth: '/api/auth',
-      users: '/api/users',
-      locations: '/api/locations',
-      buttons: '/api/buttons',
-      emails: '/api/emails'
-    }
+    message: 'Backend is reachable'
   });
 });
 
@@ -101,20 +77,11 @@ app.use('/api/users', userRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/buttons', buttonRoutes);
 app.use('/api/emails', emailRoutes);
-app.use('/api/debug', debugRoutes); // Debug-Routen hinzufügen
 
-// Debug-Routes
+// Debug-Routes nur in nicht-Produktivumgebungen oder explizit aktiviert
 if (process.env.NODE_ENV !== 'production' || process.env.DEBUG === 'true') {
-  app.get('/debug/env', (req, res) => {
-    res.json({
-      nodeEnv: process.env.NODE_ENV,
-      port: process.env.PORT,
-      apiUrl: process.env.API_URL,
-      frontendUrl: process.env.FRONTEND_URL,
-      debug: process.env.DEBUG,
-      appMode: 'TypeScript Direct Execution'
-    });
-  });
+  app.use('/api/debug', debugRoutes);
+  logger.info('Debug-Routen aktiviert');
 }
 
 // 404-Handler
@@ -147,6 +114,10 @@ app.use(errorHandler);
       logger.info('Database initialization successful after connection failure');
     } else {
       logger.error('Database initialization failed, application may not function correctly');
+      
+      // Aktiviere den DEMO_MODE wenn die Datenbankinitialisierung fehlschlägt
+      process.env.DEMO_MODE = 'true';
+      logger.warn('DEMO_MODE automatically activated due to database initialization failure');
     }
   }
 })();
